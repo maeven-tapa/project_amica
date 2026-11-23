@@ -1,0 +1,434 @@
+import { Button, ComboBox, ListView, LineEdit, TextEdit } from "std-widgets.slint";
+
+export struct ChatMessage { from-user: bool, text: string, contextual: bool, draft: bool }
+export struct ConversationRow { id: string, title: string, date: string }
+
+component ChatBubble inherits Rectangle {
+    in property <ChatMessage> message;
+    callback review(string);
+    height: bubble.height + 11px;
+
+    bubble := Rectangle {
+        x: root.message.from-user ? parent.width - self.width - 8px : 0px;
+        y: 0px;
+        width: parent.width * 0.86 - 8px;
+        height: 37px + body.preferred-height + (root.message.draft ? 38px : 0px);
+        border-radius: 13px;
+        border-width: 1px;
+        border-color: root.message.from-user ? #d2e9e6 : #e5ebef;
+        background: root.message.from-user ? #eaf6f4 : #ffffff;
+
+        Text {
+            x: 13px;
+            y: 9px;
+            text: root.message.from-user ? "You" : "Amica";
+            color: #356371;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        body := Text {
+            x: 13px;
+            y: 23px;
+            width: parent.width - 26px;
+            height: self.preferred-height;
+            text: root.message.text;
+            color: #142e3a;
+            font-size: 14px;
+            wrap: word-wrap;
+        }
+        if root.message.draft: Button {
+            x: 13px;
+            y: body.y + body.height + 5px;
+            text: "Review draft";
+            clicked => { root.review(root.message.text); }
+        }
+    }
+}
+
+component SendButton inherits FocusScope {
+    callback clicked;
+    accessible-role: button;
+    accessible-label: "Send message";
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+
+    key-released(event) => {
+        if (root.enabled && (event.text == Key.Space || event.text == Key.Return)) {
+            root.clicked();
+            return accept;
+        }
+        return reject;
+    }
+
+    Rectangle {
+        border-radius: 10px;
+        border-width: root.has-focus ? 2px : 0px;
+        border-color: #65aaa6;
+        background: root.enabled ? (mouse.has-hover ? #1a515c : #103b46) : #e7eeee;
+
+        Text {
+            x: 0px;
+            width: parent.width - 19px;
+            height: parent.height;
+            text: "Send";
+            color: root.enabled ? #ffffff : #687d83;
+            font-size: 13px;
+            font-weight: 650;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+            accessible-role: none;
+        }
+        Path {
+            x: parent.width - 23px;
+            y: (parent.height - self.height) / 2;
+            width: 12px;
+            height: 12px;
+            viewbox-width: 16;
+            viewbox-height: 16;
+            stroke: root.enabled ? #ffffff : #687d83;
+            stroke-width: 1.5px;
+            commands: "M 2.5 8 H 12.5 M 8 3.5 L 12.5 8 L 8 12.5";
+        }
+    }
+
+    mouse := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+export component ChatPanel inherits Rectangle {
+    in property <[ChatMessage]> messages;
+    in-out property <string> draft;
+    in property <string> model;
+    in property <string> error;
+    in property <bool> ready;
+    in property <bool> thinking;
+    in property <bool> voice-active;
+    in property <string> voice-caption;
+    in property <string> voice-recovery;
+    in property <string> voice-error;
+    in property <string> title;
+    in property <string> source;
+    in property <string> reply-style;
+    in property <[ConversationRow]> conversations;
+    in property <bool> private-chat;
+    in property <bool> memory-intro;
+    property <bool> history-open;
+    property <string> search-query;
+    property <bool> draft-open;
+    property <string> draft-review;
+    callback manage(string, string);
+    callback search(string);
+    callback talk;
+    callback set-style(string);
+    callback dismiss-intro;
+    callback send;
+    public function focus-message() { editor.focus(); }
+    public function open-search(query: string) {
+        root.history-open = true;
+        root.search-query = query;
+        root.search(query);
+    }
+
+    background: #f8fbfb;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: #e4ecee;
+
+    changed messages => {
+        if root.messages.length > 0 {
+            transcript.ensure-row-visible(root.messages.length - 1, ScrollBehavior.instant);
+        }
+    }
+
+    header := Rectangle {
+        x: 20px;
+        y: 0px;
+        width: parent.width - 40px;
+        height: 115px;
+
+        Text {
+            x: 0px;
+            y: 16px;
+            width: parent.width - 12px;
+            text: root.title;
+            color: #142e3a;
+            font-size: 21px;
+            font-weight: 650;
+            overflow: elide;
+        }
+
+        Text {
+            x: 0px;
+            y: 46px;
+            text: root.private-chat ? "Private session · In memory only" : root.model;
+            color: #536b74;
+            font-size: 12px;
+        }
+
+        HorizontalLayout {
+            y: 72px;
+            width: parent.width;
+            height: 34px;
+            spacing: 6px;
+            Button {
+                text: root.voice-active ? "Stop voice" : "Talk";
+                enabled: root.ready && !root.thinking;
+                clicked => { root.talk(); }
+            }
+            Button {
+                text: root.history-open ? "Back" : "Chats";
+                enabled: root.ready && !root.thinking && !root.private-chat;
+                clicked => {
+                    root.history-open = !root.history-open;
+                    root.search-query = "";
+                    root.search("");
+                }
+            }
+            Button {
+                text: root.private-chat ? "End private" : "Private";
+                enabled: root.ready && !root.thinking;
+                clicked => { root.history-open = false; root.manage("private", ""); }
+            }
+            ComboBox {
+                model: ["Auto", "Listen", "Think it through", "Help act"];
+                current-value: root.reply-style;
+                accessible-label: "Conversation mode";
+                selected(value) => { root.set-style(value); }
+            }
+        }
+
+        Rectangle {
+            y: parent.height - 1px;
+            width: parent.width;
+            height: 1px;
+            background: #e4ecee;
+        }
+    }
+
+    transcript := ListView {
+        x: 20px;
+        y: header.height + (root.memory-intro && !root.private-chat ? 45px : 0px) + (root.source != "" ? 51px : 14px);
+        width: parent.width - 36px;
+        height: max(0px, status.y - self.y - 10px);
+        horizontal-scrollbar-policy: always-off;
+        accessible-label: "Conversation history";
+        visible: !root.history-open && !root.draft-open;
+
+        for entry in root.messages: ChatBubble {
+            message: entry;
+            review(value) => { root.draft-review = value; root.draft-open = true; }
+        }
+    }
+
+    if root.memory-intro && !root.private-chat && !root.history-open && !root.draft-open: HorizontalLayout {
+        x: 20px;
+        y: header.height + 3px;
+        width: parent.width - 40px;
+        height: 42px;
+        spacing: 6px;
+        Text {
+            text: "Amica learns from completed chats. Manage capture in Settings.";
+            color: #674694;
+            font-size: 11px;
+            wrap: word-wrap;
+            vertical-alignment: center;
+        }
+        Button { text: "Got it"; clicked => { root.dismiss-intro(); } }
+    }
+
+    if root.source != "" && !root.history-open && !root.draft-open: Text {
+        x: 20px;
+        y: header.height + (root.memory-intro && !root.private-chat ? 47px : 5px);
+        width: parent.width - 40px;
+        height: 40px;
+        text: "Memory source · " + root.source;
+        color: #674694;
+        wrap: word-wrap;
+        overflow: elide;
+    }
+
+    if root.draft-open && !root.history-open: VerticalLayout {
+        x: 20px;
+        y: header.height + 8px;
+        width: parent.width - 40px;
+        height: parent.height - self.y - 18px;
+        spacing: 9px;
+        Text { text: "Message draft"; color: #142e3a; font-weight: 650; }
+        TextEdit { text <=> root.draft-review; vertical-stretch: 1; accessible-label: "Edit the message draft"; }
+        Button { text: "Back to conversation"; clicked => { root.draft-open = false; root.draft-review = ""; } }
+    }
+
+    changed private-chat => { root.draft-open = false; root.draft-review = ""; }
+    changed title => { root.draft-open = false; root.draft-review = ""; }
+
+    if root.history-open: VerticalLayout {
+        x: 20px;
+        y: header.height + 8px;
+        width: parent.width - 40px;
+        height: root.height - self.y - 16px;
+        spacing: 8px;
+        LineEdit {
+            placeholder-text: "Search saved chats";
+            accessible-label: "Search saved chats";
+            text <=> root.search-query;
+            edited(value) => { root.search(value); }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            title-editor := LineEdit { placeholder-text: "Conversation name"; }
+            Button {
+                text: "New";
+                clicked => {
+                    root.manage("new", title-editor.text == "" ? "New conversation" : title-editor.text);
+                    root.history-open = false;
+                }
+            }
+            Button {
+                text: "Rename";
+                enabled: title-editor.text != "";
+                clicked => { root.manage("rename", title-editor.text); }
+            }
+        }
+        ListView {
+            vertical-stretch: 1;
+            for chat in root.conversations: HorizontalLayout {
+                height: 40px;
+                Button {
+                    text: chat.date == "" ? chat.title : chat.title + " · " + chat.date;
+                    clicked => { root.manage("open", chat.id); root.history-open = false; }
+                }
+            }
+        }
+    }
+
+    if root.messages.length == 0 && !root.history-open && !root.draft-open: VerticalLayout {
+        x: 22px;
+        y: transcript.y;
+        width: parent.width - 44px;
+        height: transcript.height;
+        alignment: center;
+        spacing: 8px;
+
+        HorizontalLayout {
+            height: 44px;
+            alignment: center;
+            Rectangle {
+                width: 44px;
+                border-radius: 14px;
+                background: #e9f4f2;
+                Path {
+                    x: 10px;
+                    y: 10px;
+                    width: 24px;
+                    height: 24px;
+                    viewbox-width: 24;
+                    viewbox-height: 24;
+                    stroke: #286c71;
+                    stroke-width: 1.4px;
+                    commands: "M 5 4.5 H 19 Q 21 4.5 21 6.5 V 14 Q 21 16 19 16 H 10 L 5 19 V 16 Q 3 16 3 14 V 6.5 Q 3 4.5 5 4.5 Z M 7.5 9 H 16.5 M 7.5 12 H 13.5";
+                }
+            }
+        }
+
+        Text {
+            text: root.voice-active ? "Voice conversation" : root.ready ? "Start a conversation" : root.error == "" ? "Opening chat…" : "Chat unavailable";
+            color: #142e3a;
+            font-size: 18px;
+            font-weight: 600;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: root.voice-active ? "Speak when Amica is listening." : root.ready ? "Ask a question or type hello." : "";
+            color: #536b74;
+            font-size: 13px;
+            horizontal-alignment: center;
+        }
+        if !root.voice-active && !root.thinking: HorizontalLayout {
+            spacing: 6px;
+            alignment: center;
+            Button { text: "Morning check-in"; clicked => { root.draft = "Help me with a morning check-in."; editor.focus(); } }
+            Button { text: "Study buddy"; clicked => { root.draft = "Be my study buddy."; editor.focus(); } }
+            Button { text: "Daily recap"; clicked => { root.draft = "Guide me through an end-of-day recap."; editor.focus(); } }
+        }
+        if !root.voice-active && !root.thinking: HorizontalLayout {
+            alignment: center;
+            min-height: 34px;
+            ComboBox {
+                model: ["Conversation starters", "Brainstorm", "Explain", "Language practice", "Make a plan", "Rewrite"];
+                accessible-label: "Conversation starters";
+                selected(value) => {
+                    if value != "Conversation starters" {
+                        root.draft = value == "Brainstorm" ? "Brainstorm ideas for " : value == "Explain" ? "Explain briefly how " :
+                            value == "Language practice" ? "Practice a conversation with me about " : value == "Make a plan" ?
+                            "Help me make a plan for " : "Help me rewrite this for clarity: ";
+                        editor.focus();
+                    }
+                }
+            }
+        }
+    }
+
+    status := Text {
+        x: 20px;
+        y: composer.y - self.height - 8px;
+        width: parent.width - 40px;
+        height: self.text == "" ? 0px : min(49px, self.preferred-height);
+        visible: !root.history-open && !root.draft-open;
+        text: root.error != "" ? root.error : root.voice-error != "" ? root.voice-error : root.voice-caption;
+        font-size: 12px;
+        color: root.error != "" ? #952f42 : #674694;
+        wrap: word-wrap;
+        overflow: elide;
+    }
+
+    composer := Rectangle {
+        x: 20px;
+        y: parent.height - 76px;
+        width: parent.width - 40px;
+        height: 43px;
+        visible: !root.history-open && !root.draft-open;
+
+        editor := LineEdit {
+            x: 0px;
+            y: 0px;
+            width: parent.width - 82px;
+            height: parent.height;
+            text <=> root.draft;
+            placeholder-text: "Message Amica";
+            enabled: root.ready;
+            read-only: root.thinking;
+            accessible-label: "Message Amica";
+            accepted => { if root.ready && !root.thinking { root.send(); } }
+        }
+
+        SendButton {
+            x: parent.width - self.width;
+            y: 0px;
+            width: 72px;
+            height: parent.height;
+            enabled: root.ready && !root.thinking && root.draft != "";
+            clicked => { root.send(); editor.focus(); }
+        }
+    }
+
+    Text {
+        x: 20px;
+        y: parent.height - 27px;
+        width: parent.width - 40px;
+        visible: !root.history-open && !root.draft-open && (root.voice-active || root.voice-recovery == "");
+        text: root.private-chat ? "Gemini processes input online. Amica keeps no local transcript." : root.voice-active ? "Live audio goes to Gemini · Transcripts are saved locally" : "Messages go to Gemini · History is saved on this device";
+        color: #536b74;
+        font-size: 11px;
+        overflow: elide;
+    }
+
+    if !root.history-open && !root.draft-open && !root.voice-active && root.voice-recovery != "": Button {
+        x: 20px;
+        y: parent.height - 33px;
+        height: 27px;
+        text: "Recover voice transcript";
+        enabled: root.draft == "" && !root.thinking;
+        clicked => { root.draft = root.voice-recovery; editor.focus(); }
+    }
+}

@@ -1,0 +1,96 @@
+import { Button } from "std-widgets.slint";
+
+export component MediaPanel inherits Rectangle {
+    in property <string> service;
+    in property <string> error;
+    in property <bool> audio-available;
+    in property <bool> playing;
+    in property <bool> muted;
+    in property <string> player-action;
+    callback reload();
+    callback open-external();
+    callback toggle-mute();
+    callback switch-player();
+
+    out property <length> content-x: 8px;
+    out property <length> content-y: 52px;
+    out property <length> content-width: root.width - 16px;
+    out property <length> content-height: root.height - root.content-y - 8px;
+
+    background: #f6fafb;
+    border-width: 1px;
+    border-color: #e0eaee;
+    border-radius: 17px;
+
+    service-label := Text {
+        x: 17px;
+        y: 0px;
+        height: root.content-y;
+        text: root.service;
+        font-size: 17px;
+        font-weight: 650;
+        color: #173441;
+        vertical-alignment: center;
+    }
+
+    if root.playing && !root.muted && mute-button.x > service-label.x + service-label.preferred-width + 72px: Text {
+        x: service-label.x + service-label.preferred-width + 12px;
+        height: root.content-y;
+        text: "Playing";
+        font-size: 11px;
+        color: #2c6c5e;
+        vertical-alignment: center;
+    }
+
+    reload-button := Button {
+        x: parent.width - self.width - 13px;
+        y: 10px;
+        height: 32px;
+        text: "Reload";
+        clicked => { root.reload(); }
+    }
+
+    external-button := Button {
+        x: reload-button.x - self.width - 8px;
+        y: reload-button.y;
+        height: reload-button.height;
+        text: "Open externally";
+        clicked => { root.open-external(); }
+    }
+
+    mute-button := Button {
+        x: external-button.x - self.width - 8px;
+        y: reload-button.y;
+        height: reload-button.height;
+        visible: root.audio-available;
+        text: root.muted ? "Unmute" : "Mute";
+        clicked => { root.toggle-mute(); }
+    }
+
+    if root.player-action != "": Button {
+        x: mute-button.x - self.width - 8px;
+        y: reload-button.y;
+        height: reload-button.height;
+        text: root.player-action;
+        clicked => { root.switch-player(); }
+    }
+
+    Rectangle {
+        x: root.content-x;
+        y: root.content-y;
+        width: root.content-width;
+        height: root.content-height;
+        background: #ffffff;
+
+        Text {
+            x: 20px;
+            width: parent.width - 40px;
+            text: root.error == "" ? "Opening " + root.service + "…" : root.error;
+            font-size: 13px;
+            color: root.error == "" ? #4b6672 : #963a45;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            wrap: word-wrap;
+        }
+    }
+}

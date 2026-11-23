@@ -1,0 +1,235 @@
+import { Button, ScrollView } from "std-widgets.slint";
+
+component AppShortcut inherits FocusScope {
+    in property <string> name;
+    in property <string> detail;
+    in property <string> symbol;
+    in property <color> accent: #377883;
+    in property <color> tile: #eaf4f4;
+    in property <bool> featured;
+    callback open;
+
+    accessible-role: button;
+    accessible-label: "Open " + root.name;
+    accessible-action-default => { root.open(); }
+
+    key-released(event) => {
+        if (event.text == Key.Return || event.text == Key.Space) {
+            root.open();
+            return accept;
+        }
+        return reject;
+    }
+
+    Rectangle {
+        border-radius: root.featured ? 14px : 10px;
+        border-width: 1px;
+        border-color: root.has-focus ? root.accent : mouse.has-hover ? #bcd6d9 : #e0eaed;
+        background: mouse.pressed ? root.tile : mouse.has-hover ? #fbfdfd : #ffffff;
+
+        mark := Rectangle {
+            x: root.featured ? 13px : 8px;
+            y: root.featured ? 13px : (parent.height - self.height) / 2;
+            width: root.featured ? 38px : 26px;
+            height: self.width;
+            border-radius: root.featured ? 11px : 7px;
+            background: root.tile;
+
+            Path {
+                width: parent.width * 0.62;
+                height: self.width;
+                viewbox-width: 24;
+                viewbox-height: 24;
+                stroke-width: root.featured ? 1.7px : 1.25px;
+                stroke: root.accent;
+                commands: root.symbol;
+            }
+        }
+
+        Text {
+            x: root.featured ? 13px : mark.x + mark.width + 9px;
+            y: root.featured ? 61px : 0px;
+            width: parent.width - self.x - (root.featured ? 13px : 24px);
+            height: root.featured ? 21px : parent.height;
+            text: root.name;
+            font-size: root.featured ? 16px : 12px;
+            font-weight: 650;
+            color: #193943;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+
+        if root.featured: Text {
+            x: 13px;
+            y: 86px;
+            width: parent.width - 26px;
+            text: root.detail;
+            font-size: 11px;
+            color: #4f6873;
+            overflow: elide;
+        }
+
+        Path {
+            x: parent.width - (root.featured ? 27px : 20px);
+            y: root.featured ? 16px : (parent.height - self.height) / 2;
+            width: root.featured ? 13px : 10px;
+            height: self.width;
+            viewbox-width: 16;
+            viewbox-height: 16;
+            stroke-width: 1.2px;
+            stroke: #64818b;
+            commands: "M 4 12 L 12 4 M 6 4 L 12 4 L 12 10";
+        }
+    }
+
+    mouse := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.focus(); root.open(); }
+    }
+}
+
+export component AppsPanel inherits Rectangle {
+    in property <string> error;
+    in property <bool> pending;
+    callback launch(string);
+    callback settings;
+    callback system-specs;
+    callback command(string);
+
+    background: #f7fbfb;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: #e0ebed;
+
+    Text {
+        x: 20px;
+        y: 15px;
+        text: "Apps";
+        font-size: 21px;
+        font-weight: 650;
+        color: #142e3a;
+    }
+
+    Button {
+        x: parent.width - self.width - 16px;
+        y: 13px;
+        text: "Amica settings";
+        clicked => { root.settings(); }
+    }
+
+    routes := ScrollView {
+        x: 16px;
+        y: 55px;
+        width: parent.width - 32px;
+        height: parent.height - self.y - 10px;
+        horizontal-scrollbar-policy: always-off;
+        vertical-scrollbar-policy: as-needed;
+        content-width: self.visible-width;
+        content-height: max(self.visible-height, cards.height);
+
+        cards := VerticalLayout {
+            x: 4px;
+            y: 0px;
+            width: routes.visible-width - 15px;
+            height: self.preferred-height;
+            spacing: 9px;
+
+            HorizontalLayout {
+                height: 114px;
+                spacing: 9px;
+
+                AppShortcut {
+                    featured: true;
+                    name: "Spotify";
+                    detail: "Music and podcasts";
+                    tile: #e4f5eb;
+                    accent: #16864d;
+                    symbol: "M 3.5 8.4 C 8.2 6.6 14.8 7 20.5 10.2 M 5 12.4 C 9.5 10.9 14.6 11.5 18.7 14 M 6.6 16.5 C 10 15.4 13.8 15.8 16.9 17.7";
+                    open => { root.launch("spotify"); }
+                }
+                AppShortcut {
+                    featured: true;
+                    name: "YouTube";
+                    detail: "Videos and channels";
+                    tile: #fcebe9;
+                    accent: #be4547;
+                    symbol: "M 6 5 L 18 12 L 6 19 Z";
+                    open => { root.launch("youtube"); }
+                }
+            }
+
+            HorizontalLayout {
+                height: 36px;
+                spacing: 8px;
+                Button { text: "Start Focus"; clicked => { root.command("Start focus"); } }
+                Button { text: "Timers"; clicked => { root.command("Open timers"); } }
+                Button { text: "Command palette"; clicked => { root.command("Open command palette"); } }
+            }
+
+            Text {
+                height: 22px;
+                text: "System apps";
+                font-size: 13px;
+                font-weight: 650;
+                color: #395660;
+                vertical-alignment: center;
+            }
+
+            HorizontalLayout {
+                height: 39px;
+                spacing: 9px;
+
+                AppShortcut {
+                    name: "Browser";
+                    symbol: "M 12 3 A 9 9 0 1 1 11.99 3 M 3 12 H 21 M 12 3 C 7 7 7 17 12 21 C 17 17 17 7 12 3";
+                    open => { root.launch("browser"); }
+                }
+                AppShortcut {
+                    name: "Calculator";
+                    symbol: "M 6 3 H 18 V 21 H 6 Z M 8 7 H 16 M 9 12 H 10 M 14 12 H 15 M 9 16 H 10 M 14 16 H 15";
+                    open => { root.launch("calculator"); }
+                }
+            }
+
+            HorizontalLayout {
+                height: 39px;
+                spacing: 9px;
+
+                AppShortcut {
+                    name: "Notepad";
+                    symbol: "M 6 3 H 15 L 19 7 V 21 H 6 Z M 15 3 V 7 H 19 M 9 11 H 16 M 9 15 H 16";
+                    open => { root.launch("notepad"); }
+                }
+                AppShortcut {
+                    name: "File Explorer";
+                    symbol: "M 3 6 H 10 L 12 8 H 21 V 19 H 3 Z M 3 10 H 21";
+                    open => { root.launch("file_explorer"); }
+                }
+            }
+
+            HorizontalLayout {
+                height: 39px;
+                spacing: 9px;
+
+                AppShortcut {
+                    name: "Windows Settings";
+                    symbol: "M 3 7 H 21 M 3 12 H 21 M 3 17 H 21 M 8 4 V 10 M 15 9 V 15 M 10 14 V 20";
+                    open => { root.launch("settings"); }
+                }
+                AppShortcut {
+                    name: "System specs";
+                    symbol: "M 3 4 H 21 V 17 H 3 Z M 12 17 V 21 M 8 21 H 16 M 7 10 H 10 L 12 7 L 14 13 L 16 10 H 18";
+                    open => { root.system-specs(); }
+                }
+            }
+
+            if root.error != "" || root.pending: Text {
+                text: root.pending ? "Opening…" : root.error;
+                font-size: 12px;
+                color: root.pending ? #486773 : #9a3e49;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

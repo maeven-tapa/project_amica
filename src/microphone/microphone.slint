@@ -1,0 +1,178 @@
+export enum AudioState { listening, muted, unavailable }
+
+export component MicIcon inherits Rectangle {
+    in property <color> ink;
+    in property <bool> muted;
+
+    width: 20px;
+    height: 20px;
+    Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.ink;
+        stroke-width: 1.65px;
+        commands: "M 9 6 C 9 2 15 2 15 6 L 15 11 C 15 15 9 15 9 11 Z M 5.5 10.5 V 11 A 6.5 6.5 0 0 0 18.5 11 V 10.5 M 12 17.5 V 21 M 9 21 H 15";
+    }
+    if root.muted: Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        stroke: root.ink;
+        stroke-width: 1.8px;
+        commands: "M 3 3 L 21 21";
+    }
+}
+
+export component MicButton inherits FocusScope {
+    in property <AudioState> state;
+    callback clicked;
+    property <bool> active: root.state == AudioState.listening;
+    property <string> label: root.active ? "Mute microphone" : root.state == AudioState.muted ? "Unmute microphone" : "Retry microphone";
+
+    width: 198px;
+    height: 48px;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+
+    key-released(event) => {
+        if (event.text == Key.Space || event.text == Key.Return) {
+            root.clicked();
+            return accept;
+        }
+        return reject;
+    }
+
+    Rectangle {
+        x: -4px;
+        y: -4px;
+        width: parent.width + 8px;
+        height: parent.height + 8px;
+        border-radius: 17px;
+        border-width: root.has-focus ? 2px : 0px;
+        border-color: #368588;
+    }
+
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        border-radius: 13px;
+        background: mouse.has-hover ? #eaf5f5 : #f3f8f8;
+        border-width: 1px;
+        border-color: #cfdfdf;
+        animate background { duration: 140ms; }
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: 10px;
+            Rectangle {
+                width: 20px;
+                MicIcon {
+                    x: 0px;
+                    y: (parent.height - self.height) / 2;
+                    ink: #234c55;
+                    muted: root.state == AudioState.muted;
+                }
+            }
+            Text {
+                text: root.label;
+                color: #234c55;
+                font-size: 14px;
+                font-weight: 600;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+    }
+
+    mouse := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.focus(); root.clicked(); }
+    }
+}
+
+export component MicFooter inherits Rectangle {
+    in property <AudioState> audio-state;
+    in property <string> device-name;
+    in property <float> input-level;
+    in property <length> gutter;
+    property <color> ink: #142e3a;
+    property <color> secondary: #536b74;
+    property <color> rule: #e8eef0;
+    height: 60px;
+    background: #fbfdfd;
+    accessible-role: content-info;
+
+    Rectangle { y: 0px; width: parent.width; height: 1px; background: root.rule; }
+
+    Rectangle {
+        x: root.gutter;
+        y: (parent.height - self.height) / 2;
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        border-width: 1px;
+        border-color: #e0eaea;
+        background: #f2f7f8;
+
+        MicIcon {
+            x: 6px;
+            y: 6px;
+            width: 18px;
+            height: 18px;
+            ink: #4c7379;
+            muted: root.audio-state == AudioState.muted;
+        }
+    }
+
+    Text {
+        x: root.gutter + 41px;
+        y: 10px;
+        text: "Default microphone";
+        font-size: 11px;
+        color: root.secondary;
+    }
+
+    Text {
+        x: root.gutter + 41px;
+        y: 27px;
+        width: meter.x - self.x - 24px;
+        text: root.device-name;
+        font-size: 13px;
+        font-weight: 600;
+        color: root.ink;
+        overflow: elide;
+    }
+
+    meter := Rectangle {
+        x: parent.width - root.gutter - self.width;
+        y: (parent.height - self.height) / 2;
+        width: 186px;
+        height: 28px;
+        accessible-role: progress-indicator;
+        accessible-label: "Input level";
+        accessible-value: round(root.input-level * 100) + "%";
+
+        Text {
+            x: 0px;
+            height: parent.height;
+            text: "Input level";
+            font-size: 12px;
+            color: root.secondary;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+
+        for index in 16: Rectangle {
+            x: 64px + index * 7.5px;
+            y: (parent.height - self.height) / 2;
+            width: 4.5px;
+            height: 15px;
+            border-radius: 2.25px;
+            background: root.input-level * 16 > index + 0.4 ? (index >= 13 ? #187078 : #44a5a4) : #deebec;
+        }
+    }
+}

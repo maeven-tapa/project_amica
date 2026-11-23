@@ -1,0 +1,102 @@
+import { ListView } from "std-widgets.slint";
+
+export struct SavedRow { title: string, value: string, category: string }
+
+export component SavedPanel inherits Rectangle {
+    in property <[SavedRow]> entries;
+    in property <string> error;
+
+    background: #f8fbfb;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: #e4ecee;
+
+    Text {
+        x: 20px;
+        y: 16px;
+        text: "Saved";
+        color: #142e3a;
+        font-size: 21px;
+        font-weight: 650;
+    }
+    Text {
+        x: 20px;
+        y: 46px;
+        width: parent.width - 40px;
+        text: root.error == "" ? "Preferences and notes stored on this device" : root.error;
+        color: root.error == "" ? #536b74 : #952f42;
+        font-size: 12px;
+        overflow: elide;
+    }
+    Rectangle {
+        x: 20px;
+        y: 77px;
+        width: parent.width - 40px;
+        height: 1px;
+        background: #e4ecee;
+    }
+
+    if root.entries.length == 0 && root.error == "": Text {
+        x: 20px;
+        y: 102px;
+        width: parent.width - 40px;
+        text: "Ask Amica to remember a preference or save a note.";
+        color: #536b74;
+        font-size: 14px;
+        wrap: word-wrap;
+        horizontal-alignment: center;
+    }
+
+    ListView {
+        x: 20px;
+        y: 91px;
+        width: parent.width - 36px;
+        height: parent.height - 108px;
+        horizontal-scrollbar-policy: always-off;
+        accessible-label: "Saved preferences and notes";
+
+        for entry in root.entries: Rectangle {
+            height: card.height + 10px;
+
+            card := Rectangle {
+                x: 0px;
+                y: 0px;
+                width: parent.width - 8px;
+                height: 60px + body.preferred-height;
+                background: white;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: #e4ecee;
+
+                Text {
+                    x: 13px;
+                    y: 9px;
+                    text: entry.category;
+                    color: #356371;
+                    font-size: 11px;
+                    font-weight: 700;
+                }
+                Text {
+                    x: 13px;
+                    y: 24px;
+                    width: parent.width - 26px;
+                    text: entry.title;
+                    color: #142e3a;
+                    font-size: 15px;
+                    font-weight: 650;
+                    overflow: elide;
+                }
+                body := Text {
+                    x: 13px;
+                    y: 45px;
+                    width: parent.width - 26px;
+                    height: self.preferred-height;
+                    text: entry.value;
+                    color: #405860;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}

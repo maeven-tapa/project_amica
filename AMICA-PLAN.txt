@@ -1,0 +1,1903 @@
+AMICA PRODUCT AND IMPLEMENTATION PLAN
+23 November 2026 | Windows desktop | Proposed roadmap
+
+1. PRODUCT DIRECTION
+
+Amica should feel like a friend who gets to know you over time. It should pick
+up on useful details in ordinary conversation, form memory nodes on its own,
+connect related details, and bring them up when they help. The same app should
+give you a calm fullscreen view when you step away and let you operate Windows
+by voice or text when you return.
+
+The attached image is visual reference material. Its large tile, analog clock,
+rounded translucent cards, and blue-purple tint inspire the composition. The
+thermostat, intercom, lock, and lights in the image are labels in the reference.
+Amica's tiles should show its own clock, timers, orb, and desktop tools with
+original proportions, artwork, and controls.
+
+Amica already has typed chat, spoken conversation with Aoede, SQLite conversation
+history and saved notes/preferences, a memory map, clock and calendar views,
+timers, a reactive orb, media controls, an app launcher, basic window actions,
+and PC stats. Build on those features. The command catalog at the end specifies
+proposed behavior, including examples for features that already exist.
+
+Project constraints
+  Use Rust for application code, Slint as the sole GUI framework, and SQLite
+  via Rust for local persistence. Keep feature files together and omit comments
+  in source code. Reuse the existing database and migrate its schema without
+  losing saved data.
+
+2. THE CONVERSATIONAL FRIEND
+
+Conversation
+  - Give the user one timeline across typing and Aoede voice. Switching from
+    voice to text should continue the topic and preserve any draft. Show optional
+    captions and a visible microphone state. Let the user interrupt playback and
+    recover a turn after changing microphones or losing the connection.
+  - Match Filipino, English, and Taglish naturally. Offer Auto, Filipino,
+    English, and Taglish preferences. Offer Short, Normal, and Detailed reply
+    settings and accept one-off requests such as "Taglish lang, short answer."
+  - Give Amica three useful ways to respond: listen, help think it through, or
+    help act. When someone's venting, let them choose whether they want ideas.
+    Ship a morning check-in, study buddy, and end-of-day recap as optional
+    conversation starters. Keep reminders and recurring check-ins opt-in.
+  - Add named conversations, search and resume, and a private session with no
+    local transcript or memory formation. Show a clear indicator while the
+    private session is active. Keep raw audio out of persistent storage by
+    default. Use completed transcripts for voice memory.
+
+Daily usefulness
+  - Connect the existing timers and notes to reminder notifications, simple
+    to-do lists, and user-approved routines. Separate local reminders from the
+    current calendar grid, which provides dates. Add calendar integrations later
+    if there is demand. Keep schedules and timer deadlines working offline.
+  - Provide compact conversation shortcuts for brainstorming, explanations,
+    language practice, planning, and rewriting. Preview a message for review
+    when asked to draft one. Add opt-in summaries of user-selected text later.
+
+3. AUTONOMOUS MEMORY AND THE MEMORY MAP
+
+How Amica gets to know you
+  Amica notices durable details in completed typed or spoken conversations.
+  For example, saying “Mas gusto kong mag-aral kapag tahimik” is enough to form
+  a preference node. The conversation continues normally while the node is
+  created in the background. Future replies can use that preference when it
+  fits. Memory formation runs automatically in standard conversations, with a
+  first-run explanation and an off switch in Settings. Users can correct, pin,
+  or forget nodes whenever they want.
+
+What a node represents
+  - Preference: “Likes quiet study sessions.” Scope it to studying so it stays
+    compatible with preferences such as music for exercise.
+  - Goal: “Prepare for a Rust quiz.” Track the user's last stated progress and
+    an optional due date or completion state.
+  - Project: “Amica.” Keep durable decisions and current milestones connected
+    to the project so they can be recalled together.
+  - Routine: “Usually reviews notes before bed.” A routine in memory describes
+    a habit. Running a Windows routine still requires separate authorization.
+  - Interest: “Enjoys drawing.” Connect it to related goals or projects when
+    the conversation provides evidence for that connection.
+  - Short-lived context: “Wants music today.” Keep it in the current thread or
+    give it an expiry tied to the stated date. A passing mood, joke, question,
+    or imagined scenario can stay in conversation context.
+
+How nodes form, change, and get recalled
+  1. Process a finished user message or a finalized voice transcript in a
+     background worker. Each candidate contains the claim, category, scope,
+     exact source turn and supporting excerpt, and an optional expiry. Use
+     Amica's replies for conversational context. Use the user's words as the
+     evidence for claims about them. Exclude quoted material and app content
+     from automatic memory formation. Keep credentials and similarly sensitive
+     details out of automatic nodes. When capture is off or a session is private,
+     skip processing and cancel any pending writes for the affected turns.
+  2. Create durable nodes from clearly stated details. A weak inference stays
+     tentative until supported by later turns and is excluded from normal
+     recall. Deduplicate by meaning, category, and scope. Support Filipino,
+     English, and Taglish phrasing for the same concept. Replays of a voice
+     turn or a retry of the worker must be safe to process more than once.
+  3. Reinforce an existing node when another turn supports it. Connect nodes
+     using named relationships such as belongs to, supports, or supersedes
+     when the evidence supports the connection. A clear correction replaces
+     the active detail and keeps the old one out of normal recall. When two
+     claims can both be true in different contexts, keep both scopes. Resolve
+     ambiguous conflicts when they matter to an answer.
+  4. On each turn, retrieve a few relevant active nodes from SQLite. Rank by
+     relevance, scope, and evidence, using recency to break ties. Use a brief
+     reference when it helps the current conversation. If uncertain, say what
+     was mentioned and ask a focused question. Reminders and desktop actions
+     still use their own explicit requests or approved routines.
+  5. Expire temporary nodes and remove them from recall. If a source turn is
+     deleted, remove its evidence and any node or link left without support.
+     Forgetting a node removes it from the graph and recall, along with its
+     derived links and index entries. Skip that node when reprocessing old
+     history. The user can also choose whether to delete its original messages.
+
+Example across conversations
+  Monday: “May Rust quiz ako sa Friday. Mas gusto kong tahimik tuwing nag-aaral ako.”
+    Create a Rust quiz goal, with the date resolved in local time, and a quiet
+    study preference. Link the preference to the goal with a supports edge.
+  Wednesday: “Ano magandang gawin pagkatapos ng dinner?”
+    If preparation is still relevant, Amica can suggest a short, quiet Rust
+    review. The user can open the memory used and see the original line.
+  Later: “Actually, okay ang lo-fi kapag nagbabasa. Tahimik pa rin dapat kapag
+    nagme-memorize ako.”
+    Update the study preferences by activity. When the user says the quiz is
+    finished, mark the goal completed and stop resurfacing it as upcoming.
+
+How it looks and feels
+  - Extend the existing rotating Memory Map. Give goals, preferences, projects,
+    routines, and interests distinct labels and group related nodes. Briefly
+    highlight a newly formed node when the map is open. Selecting it shows its
+    sources, related nodes, last update, and history of changes. Provide a
+    searchable list view with the same controls for keyboard and screen-reader
+    users, and respect reduced motion.
+  - Add a Recent Memories view with Edit, Pin, Forget, and Open Source. Show
+    which nodes Amica learned from conversation and which were added by hand.
+    Keep the Saved view for user-authored notes and explicit preferences.
+    Settings should expose automatic memory, pause, and clear learned memories.
+
+Implementation and quality checks
+  - Extend src/memory/ with extraction, SQLite storage, retrieval, and graph
+    data. Keep the existing saved_items table. Add stable IDs for finalized
+    chat turns and store memory nodes, evidence, and typed links. Use a single
+    transaction to update a node, its evidence, links, and searchable text.
+    Start with new conversations and preserve existing notes and preferences.
+  - Exercise the full lifecycle with typed and spoken examples. Verify that an
+    ordinary remark creates a node, repeated mentions reinforce it, changes
+    update it, expired items stop surfacing, private turns create no nodes, and
+    forgetting survives restart. Test quoted text, jokes, misunderstood voice
+    input, and topic changes so they do not become persistent facts. Measure
+    correct capture and useful recall separately across the three languages.
+
+4. HOME VIEW AND SCREENSAVER
+
+Home view
+  - Give the Home screen the reference's tile hierarchy using Amica's identity.
+    Use a large left tile for the orb, current voice state, and a Talk action.
+    Stack an analog clock/date and timer tile at right. Use three bottom tiles
+    for Focus, Now Playing, and Command Palette. Reuse the orb's palette and
+    carry navy, indigo, and lavender through the cards. Use a soft gradient
+    backdrop, layered translucent fills, and accessible contrast in Slint.
+  - Let cards reflow to a single column at narrow widths. Keep a visible focus
+    ring, large touch targets, readable numerals, and keyboard navigation.
+    Show values only when there is real data. The calendar/timer tile can show
+    the local date or the next active timer with time remaining.
+
+Screensaver
+  - Take inspiration from macOS screensavers for slow fullscreen motion and a
+    graceful return to the desktop. Add two presets. Ambient shows a large
+    clock/date, softly moving color and orb, and optionally the active timer
+    countdown. Dashboard uses the Home tile arrangement with clock, timer,
+    orb, and media status. Hide
+    private text, notification contents, and transcripts in both presets.
+  - Ship manual entry, a Preview button, and optional idle activation after
+    5, 10, 15, or 30 minutes in the first release. Use Windows session idle
+    time and skip automatic entry during active voice, presentation, or
+    fullscreen media. Start with the monitor that contains Amica, then add
+    primary/all-monitor options.
+    Exit on Escape or physical input and restore the visible window state.
+    Use visible physical interaction to return from Ambient before talking.
+  - Release the microphone and end the voice session when the saver enters. Let
+    Windows manage display sleep and lock. A later optional Lock on Exit setting
+    can call the Windows lock action. Support reduced motion, a dim-on-battery
+    option, gentle tile drift for static content, and a fallback for missing
+    media/timer data. Keep idle rendering coalesced and low power.
+  - Store timeout, preset, motion, privacy, and monitor preferences in SQLite.
+    Build this in src/screensaver/ with a Slint component and Rust idle and
+    lifecycle logic. Consider Windows .scr integration only after testing the
+    in-app mode on different monitors, scaling levels, and sleep/wake cycles.
+
+5. WINDOWS CONTROL
+
+Execution model
+  - Route text, command palette, approved routines, and recognized voice
+    requests to one Rust dispatcher. Keep action IDs, typed arguments,
+    English/Filipino/Taglish examples, behavior, prerequisites, and permissions
+    in a shared catalog. Put feature-specific definitions beside each handler.
+    Reuse src/actions/ for dispatch and src/desktop/ for Windows integration.
+    Give substantial features such as routines their own folders.
+  - Resolve known typed commands and palette actions locally so they work
+    offline. Keep validation and execution in the dispatcher when the
+    conversation needs help interpreting an ambiguous request.
+  - Use native Windows APIs for windows, displays, audio, and files where
+    possible. Use Windows UI Automation for accessible elements by name, role,
+    and scope. Use SendInput for mouse, wheel, and key input in the active user
+    session. Use a labeled grid or numbered overlay for apps that do not expose
+    controls. Ask which target when there are multiple matches. Show the chosen
+    window in the command bar. Handle monitor coordinates, negative origins,
+    mixed DPI, and focus changes before sending input.
+  - Add Desktop Control mode with visible start/stop state. Quick low-impact
+    actions run on explicit request. For delete, overwrite, send, power, bulk
+    changes, or costly actions, show the exact target and ask the user to
+    confirm the current action in Amica. Apply this to existing restart and
+    shutdown paths, including speech. Distinguish "start the screensaver",
+    "close Amica", "sleep the PC", and "shut down the PC" with explicit intents.
+  - Keep the executor within the signed-in user's interactive session and its
+    normal privileges. Locked desktops and protected or elevated surfaces may
+    be unreachable. Keep authentication and administrative prompts in Windows.
+    Treat page text, screenshots, file content, memory, and app labels as data.
+    Only the user's current request or an approved routine can authorize a step.
+  - Give every run a Stop control. Revalidate focus and target before each
+    action, expire stale voice requests, serialize input, and release injected
+    mouse buttons and keys on interruption. Report completion from the local
+    action result. Store redacted results and time in a local action history,
+    omitting private typed text, clipboard contents, and keys. Deduplicate
+    requests across retries. Show undo when the action actually supports it.
+
+Feature sequence
+  - Start with pointer movement, hover, left/right/double click, scrolling,
+    drag, a grid overlay, hotkeys, text insertion, and window/app switching.
+    Keep "click here" scoped to the current pointer and "click Save" scoped
+    to the active or explicitly named app. Show matches for ambiguous labels.
+  - Add File Explorer, browser navigation, clipboard, Notepad, and audio and
+    display controls. Resolve common folders by Windows known-folder IDs.
+    Treat observed UI support as the capability boundary and show missing app
+    or unavailable feature errors. Use a few supported apps to validate each
+    adapter before broadening. Keep app installation and credentials manual.
+  - Add user-defined routines composed of typed actions, such as Focus, Study,
+    and End of Day. Show ordered steps and a preview. Stop on failed steps and
+    show which completed. Revalidate before continuing. Constrain repeat counts
+    and durations. Prompt when a workflow reaches an action needing consent.
+    Start Focus with a 25-minute timer, open the chosen editor, and optionally
+    pause playback. Start Study with a named folder, two chosen apps, and a
+    reading timer. End of Day can save the current layout and show tomorrow's
+    first local task. Save or close work through the app's normal interactions.
+
+6. RELEASE ORDER AND DEFINITION OF DONE
+
+Release 0.1 refinement | Conversation + automatic memory
+  Unify typed and spoken conversation history. Add automatic preference and
+  goal nodes, source links, recall across conversations, and the first version
+  of Recent Memories. Add the private session, memory controls, and the ability
+  to correct or forget a node. Confirm that typed and spoken remarks can form
+  a memory automatically and that reloading Amica preserves the result.
+
+Release 0.2 | Home + screensaver + pointer controls
+  Ship original Home tiles and two fullscreen presets. Deliver the pointer,
+  click, wheel, keys, window-switching, and overlay actions. Exercise the core
+  command set in a test window and with mixed-DPI monitors. Target 25 high-use
+  actions, each with English, Filipino, and Taglish examples and an expected
+  outcome. Confirm keyboard-only access, saver exit, and offline typed input.
+
+Release 0.3 | Everyday tools + expanded memory graph
+  Expand to 60 action families across apps, Explorer, browser, clipboard,
+  media, and settings. Add reminders, searchable conversations, project and
+  routine nodes, relationship editing, and activity-specific preferences.
+  Verify migrations against an existing SQLite profile. Exercise connection
+  loss, clipboard privacy, target changes, and retries in a test workspace.
+
+Release 0.4 | Routines + full catalog coverage
+  Progress toward 120 command families using the appendix as the acceptance
+  backlog. Connect the catalog to the palette, show prerequisites, and deliver
+  named routines and accessibility improvements. Run all 1,200 examples against
+  intent resolution. Run representative executions with test windows and files.
+  Track intent accuracy by language and execution success by app. A release
+  passes only when common actions have clear outcomes, unsupported actions
+  explain the limitation, and sensitive operations cannot run on stale approval.
+
+First vertical slice to build
+  Say “Mas gusto kong tahimik kapag nag-aaral ako” during a voice conversation.
+  Open the Memory Map and find the preference and its source. Start a new typed
+  chat and ask for a study plan. Check that Amica suggests a quiet session when
+  relevant. Edit or forget the node, then repeat the request to verify that the
+  change takes effect. Follow with a focus timer, Ambient, and a Notepad scroll
+  command in the screensaver and desktop-control release.
+
+References
+  Microsoft UI Automation, input injection, and session idle detection
+  https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-uiautomationoverview
+  https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
+  https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getlastinputinfo
+
+APPENDIX. COMMAND CATALOG
+
+1,200 concrete command examples across 120 action or conversation families.
+Packs 01–10 cover 1,000 Windows commands. Packs 11–12 cover 200 requests
+for conversation and Amica's local features. The catalog pairs each family
+with its expected behavior and uses different targets, values, and situations.
+It is a development and acceptance backlog. App names, control labels, files,
+and saved routines are fixtures. Create them in a disposable test workspace.
+Missing prerequisites or unsupported actions should produce clear feedback.
+
+EN is English, FIL is Filipino, and TG is Taglish. Windows terms and labels
+may keep their original names. Every family has examples in all three.
+The sample phrases are starting points for additional paraphrase tests.
+
+Use these common commands during early testing alongside the catalog:
+  “Stop now” cancels pending input and releases held keys and mouse buttons.
+  “Start the Ambient screensaver” enters fullscreen and ends voice capture.
+  “I-on ang Dashboard screensaver” opens the fullscreen dashboard preset.
+  Escape or physical input dismisses the saver and restores the desktop view.
+  “Buksan ang command palette” shows locally available commands.
+  “Click Save in Notepad” resolves the exact button in the named test app.
+  “Paki-scroll down three notches” sends three notches to the current target.
+  “May timer pa ba ako?” reads actual running timers from SQLite.
+  “I-shut down ang PC” displays the power confirmation for the current request.
+  “Sleep the PC” previews Windows sleep using a separate local power intent.
+  “Sige, close Amica” ends Amica after an explicit exit request.
+  “Gusto ko muna mag-type” switches input mode and preserves the conversation.
+
+01 | Pointer and scrolling
+
+  01.01 Move relative
+  Expected: Move the pointer by the specified physical-pixel offset.
+    0001 [EN] Move the mouse 40 pixels left.
+    0002 [FIL] Iusog mo ang mouse nang 80 pixel pakanan.
+    0003 [TG] Move mo ang pointer 30 pixels up.
+    0004 [EN] Move the mouse 60 pixels down.
+    0005 [FIL] Iusog mo ang mouse nang 120 pixel pakaliwa.
+    0006 [TG] Move mo ang pointer 160 pixels right.
+    0007 [EN] Move the mouse 75 pixels up.
+    0008 [FIL] Iusog mo ang mouse nang 90 pixel pababa.
+    0009 [TG] Move mo ang pointer 15 pixels left.
+    0010 [EN] Move the mouse 25 pixels right.
+
+  01.02 Move inside window
+  Expected: Move the pointer to the named point inside the active test window.
+    0011 [FIL] Ilipat ang cursor sa gitna ng window na ito.
+    0012 [TG] Punta ang cursor sa the top-left corner ng current window.
+    0013 [EN] Move the cursor to the top edge midpoint in this window.
+    0014 [FIL] Ilipat ang cursor sa itaas na kanang sulok ng window na ito.
+    0015 [TG] Punta ang cursor sa the left edge midpoint ng current window.
+    0016 [EN] Move the cursor to the right edge midpoint in this window.
+    0017 [FIL] Ilipat ang cursor sa ibaba na kaliwang sulok ng window na ito.
+    0018 [TG] Punta ang cursor sa the bottom edge midpoint ng current window.
+    0019 [EN] Move the cursor to the bottom-right corner in this window.
+    0020 [FIL] Ilipat ang cursor sa gitna ng title bar ng window na ito.
+
+  01.03 Click grid cell
+  Expected: Left-click once in the numbered cell of the visible mouse grid.
+    0021 [TG] Click mo yung grid cell 1.
+    0022 [EN] Click grid cell 2.
+    0023 [FIL] I-click ang kahon 3 sa grid.
+    0024 [TG] Click mo yung grid cell 4.
+    0025 [EN] Click grid cell 5.
+    0026 [FIL] I-click ang kahon 6 sa grid.
+    0027 [TG] Click mo yung grid cell 7.
+    0028 [EN] Click grid cell 8.
+    0029 [FIL] I-click ang kahon 9 sa grid.
+    0030 [TG] Click mo yung grid cell 10.
+
+  01.04 Right-click
+  Expected: Open the context menu at the named target in a fixture app.
+    0031 [EN] Right-click the desktop background.
+    0032 [FIL] I-right-click ang Downloads folder.
+    0033 [TG] Right-click mo yung taskbar.
+    0034 [EN] Right-click the active browser tab.
+    0035 [FIL] I-right-click ang selected photo.
+    0036 [TG] Right-click mo yung selected text.
+    0037 [EN] Right-click the empty area in Explorer.
+    0038 [FIL] I-right-click ang pinned Notepad icon.
+    0039 [TG] Right-click mo yung current hyperlink.
+    0040 [EN] Right-click the selected PDF.
+
+  01.05 Double-click
+  Expected: Send a double-click to the named target in the test workspace.
+    0041 [FIL] I-double-click ang Reports folder.
+    0042 [TG] Double-click mo yung Budget.xlsx file.
+    0043 [EN] Double-click the photo called Lake.jpg.
+    0044 [FIL] I-double-click ang Draft.txt file.
+    0045 [TG] Double-click mo yung Sample.pdf file.
+    0046 [EN] Double-click the Archive folder.
+    0047 [FIL] I-double-click ang window title bar.
+    0048 [TG] Double-click mo yung Project Plan shortcut.
+    0049 [EN] Double-click the Work folder.
+    0050 [FIL] I-double-click ang Notes.txt file.
+
+  01.06 Middle-click
+  Expected: Send a middle-click to the explicit target in a browser fixture.
+    0051 [TG] Middle-click mo yung About link.
+    0052 [EN] Middle-click the Help link.
+    0053 [FIL] I-middle-click ang Roadmap link.
+    0054 [TG] Middle-click mo yung Release Notes link.
+    0055 [EN] Middle-click the Contact link.
+    0056 [FIL] I-middle-click ang third tab.
+    0057 [TG] Middle-click mo yung Docs tab.
+    0058 [EN] Middle-click the Community link.
+    0059 [FIL] I-middle-click ang second tab.
+    0060 [TG] Middle-click mo yung Examples link.
+
+  01.07 Hover over control
+  Expected: Position the pointer on the resolved control and leave it there.
+    0061 [EN] Hover over the Save button.
+    0062 [FIL] Itapat ang cursor sa Close button.
+    0063 [TG] Hover ka sa address bar.
+    0064 [EN] Hover over the Search box.
+    0065 [FIL] Itapat ang cursor sa volume icon.
+    0066 [TG] Hover ka sa battery icon.
+    0067 [EN] Hover over the Wi-Fi icon.
+    0068 [FIL] Itapat ang cursor sa Back button.
+    0069 [TG] Hover ka sa Bookmark button.
+    0070 [EN] Hover over the Help icon.
+
+  01.08 Drag pointer
+  Expected: Press the left button at the current pointer, drag by the offset, then release.
+    0071 [FIL] I-drag mula rito nang 20 pixel pataas.
+    0072 [TG] Drag mo from here 130 pixels right.
+    0073 [EN] Drag from here 180 pixels down.
+    0074 [FIL] I-drag mula rito nang 50 pixel pakaliwa.
+    0075 [TG] Drag mo from here 60 pixels up.
+    0076 [EN] Drag from here 200 pixels right.
+    0077 [FIL] I-drag mula rito nang 110 pixel pababa.
+    0078 [TG] Drag mo from here 100 pixels left.
+    0079 [EN] Drag from here 150 pixels up.
+    0080 [FIL] I-drag mula rito nang 280 pixel pababa.
+
+  01.09 Vertical scroll
+  Expected: Send the requested wheel amount over the active scroll target.
+    0081 [TG] Scroll mo down one notch.
+    0082 [EN] Scroll down two notches.
+    0083 [FIL] I-scroll pababa nang tatlong ikot.
+    0084 [TG] Scroll mo down five notches.
+    0085 [EN] Scroll down eight notches.
+    0086 [FIL] I-scroll pataas nang isang ikot.
+    0087 [TG] Scroll mo up two notches.
+    0088 [EN] Scroll up three notches.
+    0089 [FIL] I-scroll pataas nang limang ikot.
+    0090 [TG] Scroll mo up eight notches.
+
+  01.10 Horizontal scroll
+  Expected: Send horizontal wheel input to the active scrollable surface.
+    0091 [EN] Scroll horizontally left one notch.
+    0092 [FIL] I-scroll nang pahalang pakanan nang isang ikot.
+    0093 [TG] Horizontal scroll right two notches.
+    0094 [EN] Scroll horizontally left two notches.
+    0095 [FIL] I-scroll nang pahalang pakaliwa nang tatlong ikot.
+    0096 [TG] Horizontal scroll right three notches.
+    0097 [EN] Scroll horizontally right five notches.
+    0098 [FIL] I-scroll nang pahalang pakaliwa nang limang ikot.
+    0099 [TG] Horizontal scroll left eight notches.
+    0100 [EN] Scroll horizontally right eight notches.
+
+02 | Keyboard, focus, and text input
+
+  02.01 Press key
+  Expected: Send one press and release of the named key to the active test surface.
+    0101 [FIL] Pindutin nang isang beses ang Tab.
+    0102 [TG] Press mo once ang Enter.
+    0103 [EN] Press Escape once.
+    0104 [FIL] Pindutin nang isang beses ang Space.
+    0105 [TG] Press mo once ang Backspace.
+    0106 [EN] Press Home once.
+    0107 [FIL] Pindutin nang isang beses ang End.
+    0108 [TG] Press mo once ang Page Up.
+    0109 [EN] Press Page Down once.
+    0110 [FIL] Pindutin nang isang beses ang Right Arrow.
+
+  02.02 Press key chord
+  Expected: Send the exact named chord to the active test surface.
+    0111 [TG] Press mo ang shortcut na Ctrl+F.
+    0112 [EN] Press the key combination Ctrl+Home.
+    0113 [FIL] Pindutin nang sabay ang Ctrl+End.
+    0114 [TG] Press mo ang shortcut na Ctrl+Shift+Tab.
+    0115 [EN] Press the key combination Shift+Tab.
+    0116 [FIL] Pindutin nang sabay ang Ctrl+L.
+    0117 [TG] Press mo ang shortcut na Ctrl+G.
+    0118 [EN] Press the key combination Ctrl+H.
+    0119 [FIL] Pindutin nang sabay ang Ctrl+Shift+Esc.
+    0120 [TG] Press mo ang shortcut na Alt+Left.
+
+  02.03 Repeat key
+  Expected: Send the bounded key repetitions and release the key between presses.
+    0121 [EN] Repeat Tab twice in the current window.
+    0122 [FIL] Ulitin sa kasalukuyang window ang Left Arrow three times.
+    0123 [TG] Repeat mo sa current window ang Down Arrow four times.
+    0124 [EN] Repeat Backspace five times in the current window.
+    0125 [FIL] Ulitin sa kasalukuyang window ang Up Arrow six times.
+    0126 [TG] Repeat mo sa current window ang Right Arrow seven times.
+    0127 [EN] Repeat Space twice in the current window.
+    0128 [FIL] Ulitin sa kasalukuyang window ang Page Down twice.
+    0129 [TG] Repeat mo sa current window ang Page Up three times.
+    0130 [EN] Repeat Delete four times in the current window.
+
+  02.04 Type literal text
+  Expected: Insert the quoted text in the focused editable field on explicit request.
+    0131 [FIL] I-type ang “Hello Amica” sa kinalalagyang field.
+    0132 [TG] Type mo ang “Kumusta ka” sa active field.
+    0133 [EN] Type “Salamat po” into the focused field.
+    0134 [FIL] I-type ang “Meeting at 10 AM” sa kinalalagyang field.
+    0135 [TG] Type mo ang “Review the draft” sa active field.
+    0136 [EN] Type “Project 2026” into the focused field.
+    0137 [FIL] I-type ang “Status: ready” sa kinalalagyang field.
+    0138 [TG] Type mo ang “Plan A and Plan B” sa active field.
+    0139 [EN] Type “Magandang umaga” into the focused field.
+    0140 [FIL] I-type ang “See you tomorrow” sa kinalalagyang field.
+
+  02.05 Insert symbol
+  Expected: Insert the named literal symbol into the focused test field.
+    0141 [TG] Insert mo ang peso sign sa field na ito.
+    0142 [EN] Insert a euro sign into this text field.
+    0143 [FIL] Ilagay ang em dash sa field na ito.
+    0144 [TG] Insert mo ang copyright sign sa field na ito.
+    0145 [EN] Insert an at sign into this text field.
+    0146 [FIL] Ilagay ang question mark sa field na ito.
+    0147 [TG] Insert mo ang degree sign sa field na ito.
+    0148 [EN] Insert a semicolon into this text field.
+    0149 [FIL] Ilagay ang ellipsis character sa field na ito.
+    0150 [TG] Insert mo ang check mark sa field na ito.
+
+  02.06 Select by key direction
+  Expected: Extend the existing text selection by the requested amount and direction.
+    0151 [EN] Extend the text selection one character left.
+    0152 [FIL] Palawakin ang piniling teksto nang dalawang karakter pakanan.
+    0153 [TG] Extend mo ang selection one word left.
+    0154 [EN] Extend the text selection two words right.
+    0155 [FIL] Palawakin ang piniling teksto nang tatlong salita pakaliwa.
+    0156 [TG] Extend mo ang selection four words right.
+    0157 [EN] Extend the text selection one line up.
+    0158 [FIL] Palawakin ang piniling teksto nang dalawang linya pababa.
+    0159 [TG] Extend mo ang selection to the start of the line.
+    0160 [EN] Extend the text selection to the end of the line.
+
+  02.07 Focus named control
+  Expected: Move keyboard focus to a uniquely matched accessible control.
+    0161 [FIL] Ilipat ang focus sa Search box.
+    0162 [TG] I-focus mo ang address bar without clicking.
+    0163 [EN] Focus the main document without clicking it.
+    0164 [FIL] Ilipat ang focus sa tab strip.
+    0165 [TG] I-focus mo ang file name field without clicking.
+    0166 [EN] Focus the message body without clicking it.
+    0167 [FIL] Ilipat ang focus sa user name field.
+    0168 [TG] I-focus mo ang left navigation list without clicking.
+    0169 [EN] Focus the comment field without clicking it.
+    0170 [FIL] Ilipat ang focus sa Zoom slider.
+
+  02.08 Invoke named control
+  Expected: Activate the uniquely matched accessible control inside the fixture window.
+    0171 [TG] Activate mo ang Refresh button sa active window.
+    0172 [EN] Activate the Next button in this window.
+    0173 [FIL] I-activate ang Previous button sa window na ito.
+    0174 [TG] Activate mo ang Close dialog button sa active window.
+    0175 [EN] Activate the Expand details button in this window.
+    0176 [FIL] I-activate ang Pause button sa window na ito.
+    0177 [TG] Activate mo ang More options button sa active window.
+    0178 [EN] Activate the Page layout tab in this window.
+    0179 [FIL] I-activate ang Select folder button sa window na ito.
+    0180 [TG] Activate mo ang Collapse menu button sa active window.
+
+  02.09 Set slider value
+  Expected: Set a supported accessible slider to an exact value and report the actual value.
+    0181 [EN] Set the selected slider to 5 percent.
+    0182 [FIL] Itakda ang napiling slider sa 10 percent.
+    0183 [TG] Set mo sa 20 percent ang napiling slider.
+    0184 [EN] Set the selected slider to 30 percent.
+    0185 [FIL] Itakda ang napiling slider sa 40 percent.
+    0186 [TG] Set mo sa 50 percent ang napiling slider.
+    0187 [EN] Set the selected slider to 60 percent.
+    0188 [FIL] Itakda ang napiling slider sa 75 percent.
+    0189 [TG] Set mo sa 90 percent ang napiling slider.
+    0190 [EN] Set the selected slider to 100 percent.
+
+  02.10 Go to item number
+  Expected: Select the numbered entry in a visible app list without opening it.
+    0191 [FIL] Piliin ang bilang 1 sa listahang ito.
+    0192 [TG] Select mo ang item 2 sa list na ito.
+    0193 [EN] Select item 3 in this list.
+    0194 [FIL] Piliin ang bilang 4 sa listahang ito.
+    0195 [TG] Select mo ang item 5 sa list na ito.
+    0196 [EN] Select item 6 in this list.
+    0197 [FIL] Piliin ang bilang 7 sa listahang ito.
+    0198 [TG] Select mo ang item 8 sa list na ito.
+    0199 [EN] Select item 9 in this list.
+    0200 [FIL] Piliin ang bilang 10 sa listahang ito.
+
+03 | Apps and windows
+
+  03.01 Launch app
+  Expected: Open the specified installed app using its registered app identity.
+    0201 [TG] Open mo ang Notepad.
+    0202 [EN] Open Calculator.
+    0203 [FIL] Buksan ang File Explorer.
+    0204 [TG] Open mo ang Paint.
+    0205 [EN] Open Photos.
+    0206 [FIL] Buksan ang Clock.
+    0207 [TG] Open mo ang Snipping Tool.
+    0208 [EN] Open Microsoft Edge.
+    0209 [FIL] Buksan ang Settings.
+    0210 [TG] Open mo ang Microsoft Store.
+
+  03.02 Switch app
+  Expected: Focus the named running app and prompt if multiple matches are equally likely.
+    0211 [EN] Switch to Notepad.
+    0212 [FIL] Lumipat sa Calculator.
+    0213 [TG] Switch mo sa File Explorer.
+    0214 [EN] Switch to Paint.
+    0215 [FIL] Lumipat sa Photos.
+    0216 [TG] Switch mo sa Clock.
+    0217 [EN] Switch to Microsoft Edge.
+    0218 [FIL] Lumipat sa Settings.
+    0219 [TG] Switch mo sa Word.
+    0220 [EN] Switch to Excel.
+
+  03.03 Minimize window
+  Expected: Minimize just the named window.
+    0221 [FIL] I-minimize ang window ng Notepad.
+    0222 [TG] Minimize mo ang Calculator window.
+    0223 [EN] Minimize the File Explorer window.
+    0224 [FIL] I-minimize ang window ng Paint.
+    0225 [TG] Minimize mo ang Photos window.
+    0226 [EN] Minimize the Clock window.
+    0227 [FIL] I-minimize ang window ng Microsoft Edge.
+    0228 [TG] Minimize mo ang Settings window.
+    0229 [EN] Minimize the Word window.
+    0230 [FIL] I-minimize ang window ng Excel.
+
+  03.04 Maximize window
+  Expected: Maximize the named window if it supports maximizing.
+    0231 [TG] Maximize mo ang Notepad window.
+    0232 [EN] Maximize the File Explorer window.
+    0233 [FIL] Palakihin ang window ng Paint.
+    0234 [TG] Maximize mo ang Photos window.
+    0235 [EN] Maximize the Microsoft Edge window.
+    0236 [FIL] Palakihin ang window ng Settings.
+    0237 [TG] Maximize mo ang Word window.
+    0238 [EN] Maximize the Excel window.
+    0239 [FIL] Palakihin ang window ng PowerPoint.
+    0240 [TG] Maximize mo ang Task Manager window.
+
+  03.05 Restore window
+  Expected: Restore the named window to its normal size and placement.
+    0241 [EN] Restore the Notepad window to normal size.
+    0242 [FIL] Ibalik sa karaniwang laki ang window ng File Explorer.
+    0243 [TG] Restore mo ang normal size ng Paint window.
+    0244 [EN] Restore the Photos window to normal size.
+    0245 [FIL] Ibalik sa karaniwang laki ang window ng Microsoft Edge.
+    0246 [TG] Restore mo ang normal size ng Settings window.
+    0247 [EN] Restore the Word window to normal size.
+    0248 [FIL] Ibalik sa karaniwang laki ang window ng Excel.
+    0249 [TG] Restore mo ang normal size ng PowerPoint window.
+    0250 [EN] Restore the Task Manager window to normal size.
+
+  03.06 Close window
+  Expected: Ask the app to close gracefully and leave its unsaved-work prompt visible.
+    0251 [FIL] Isara ang window ng Notepad.
+    0252 [TG] Close mo ang Calculator window.
+    0253 [EN] Close the File Explorer window.
+    0254 [FIL] Isara ang window ng Paint.
+    0255 [TG] Close mo ang Photos window.
+    0256 [EN] Close the Clock window.
+    0257 [FIL] Isara ang window ng Microsoft Edge.
+    0258 [TG] Close mo ang Settings window.
+    0259 [EN] Close the Word window.
+    0260 [FIL] Isara ang window ng Excel.
+
+  03.07 Snap window
+  Expected: Place the current window in the specified supported work-area region.
+    0261 [TG] Snap mo itong window sa the left half.
+    0262 [EN] Snap this window to the right half.
+    0263 [FIL] I-snap ang window na ito sa itaas na kaliwang bahagi.
+    0264 [TG] Snap mo itong window sa the upper-right quarter.
+    0265 [EN] Snap this window to the lower-left quarter.
+    0266 [FIL] I-snap ang window na ito sa ibabang kanang bahagi.
+    0267 [TG] Snap mo itong window sa the left third.
+    0268 [EN] Snap this window to the middle third.
+    0269 [FIL] I-snap ang window na ito sa ikatlong bahagi sa kanan.
+    0270 [TG] Snap mo itong window sa the left two-thirds.
+
+  03.08 Move to display
+  Expected: Move the specified window to monitor 2 when a second display is present.
+    0271 [EN] Move Notepad to monitor 2.
+    0272 [FIL] Ilipat ang File Explorer sa monitor 2.
+    0273 [TG] Move mo ang Paint sa second monitor.
+    0274 [EN] Move Photos to monitor 2.
+    0275 [FIL] Ilipat ang Microsoft Edge sa monitor 2.
+    0276 [TG] Move mo ang Settings sa second monitor.
+    0277 [EN] Move Word to monitor 2.
+    0278 [FIL] Ilipat ang Excel sa monitor 2.
+    0279 [TG] Move mo ang PowerPoint sa second monitor.
+    0280 [EN] Move Task Manager to monitor 2.
+
+  03.09 Resize window
+  Expected: Resize the active test window to the requested logical dimensions within app limits.
+    0281 [FIL] Baguhin ang laki ng window na ito sa 800 sa 600.
+    0282 [TG] Resize mo itong window to 900 by 700.
+    0283 [EN] Resize this window to 1024 by 768.
+    0284 [FIL] Baguhin ang laki ng window na ito sa 1100 sa 800.
+    0285 [TG] Resize mo itong window to 1200 by 800.
+    0286 [EN] Resize this window to 1280 by 720.
+    0287 [FIL] Baguhin ang laki ng window na ito sa 1366 sa 768.
+    0288 [TG] Resize mo itong window to 1400 by 900.
+    0289 [EN] Resize this window to 1440 by 900.
+    0290 [FIL] Baguhin ang laki ng window na ito sa 1600 sa 900.
+
+  03.10 Find window by title
+  Expected: Find a window by title and show matches in Amica's picker.
+    0291 [TG] Find mo ang window named Project Atlas.
+    0292 [EN] Find the window named Demo Board.
+    0293 [FIL] Hanapin ang window na pinamagatang Draft Budget.
+    0294 [TG] Find mo ang window named Meeting Notes.
+    0295 [EN] Find the window named Test Explorer.
+    0296 [FIL] Hanapin ang window na pinamagatang Study Plan.
+    0297 [TG] Find mo ang window named Reference PDF.
+    0298 [EN] Find the window named Travel Board.
+    0299 [FIL] Hanapin ang window na pinamagatang Amica QA.
+    0300 [TG] Find mo ang window named Day Planner.
+
+04 | File Explorer
+
+  04.01 Open known folder
+  Expected: Open the resolved Windows known folder in Explorer.
+    0301 [EN] Take me to Downloads.
+    0302 [FIL] Dalhin mo ako sa Documents.
+    0303 [TG] Open mo yung folder na Pictures.
+    0304 [EN] Take me to Music.
+    0305 [FIL] Dalhin mo ako sa Videos.
+    0306 [TG] Open mo yung folder na Desktop.
+    0307 [EN] Take me to Home.
+    0308 [FIL] Dalhin mo ako sa This PC.
+    0309 [TG] Open mo yung folder na Recycle Bin.
+    0310 [EN] Take me to Screenshots.
+
+  04.02 Create folder
+  Expected: Create the named directory inside the visible fixture folder.
+    0311 [FIL] Gumawa rito ng folder na April Notes.
+    0312 [TG] Create ka ng folder named Invoices dito.
+    0313 [EN] Make a folder called Mockups here.
+    0314 [FIL] Gumawa rito ng folder na Reading List.
+    0315 [TG] Create ka ng folder named Photos to Sort dito.
+    0316 [EN] Make a folder called Workshop here.
+    0317 [FIL] Gumawa rito ng folder na Receipts.
+    0318 [TG] Create ka ng folder named Draft Exports dito.
+    0319 [EN] Make a folder called Class Materials here.
+    0320 [FIL] Gumawa rito ng folder na Trip Ideas.
+
+  04.03 Find local item
+  Expected: Search file names inside the chosen folder and show matching paths locally.
+    0321 [TG] Search mo dito ang files na may invoice sa filename.
+    0322 [EN] Find files with budget in the name here.
+    0323 [FIL] Hanapin dito ang mga file na may meeting sa pangalan.
+    0324 [TG] Search mo dito ang files na may report sa filename.
+    0325 [EN] Find files with draft in the name here.
+    0326 [FIL] Hanapin dito ang mga file na may screenshot sa pangalan.
+    0327 [TG] Search mo dito ang files na may receipt sa filename.
+    0328 [EN] Find files with slides in the name here.
+    0329 [FIL] Hanapin dito ang mga file na may backup sa pangalan.
+    0330 [TG] Search mo dito ang files na may outline sa filename.
+
+  04.04 Filter by extension
+  Expected: Filter the current folder's visible items by the given extension.
+    0331 [EN] Show only PDF files here.
+    0332 [FIL] Ipakita lang dito ang mga PNG file.
+    0333 [TG] Filter ang folder na ito to JPG files.
+    0334 [EN] Show only TXT files here.
+    0335 [FIL] Ipakita lang dito ang mga DOCX file.
+    0336 [TG] Filter ang folder na ito to XLSX files.
+    0337 [EN] Show only PPTX files here.
+    0338 [FIL] Ipakita lang dito ang mga CSV file.
+    0339 [TG] Filter ang folder na ito to MP3 files.
+    0340 [EN] Show only ZIP files here.
+
+  04.05 Sort items
+  Expected: Sort the current Explorer file list by the specified field and direction.
+    0341 [FIL] Ayusin ang listahan ng file ayon sa pangalan mula A hanggang Z.
+    0342 [TG] Sort mo ang folder by name descending.
+    0343 [EN] Sort this folder by date modified newest first.
+    0344 [FIL] Ayusin ang listahan ng file ayon sa petsa ng pagbabago mula pinakaluma.
+    0345 [TG] Sort mo ang folder by size largest first.
+    0346 [EN] Sort this folder by size smallest first.
+    0347 [FIL] Ayusin ang listahan ng file ayon sa uri mula A hanggang Z.
+    0348 [TG] Sort mo ang folder by type descending.
+    0349 [EN] Sort this folder by date created newest first.
+    0350 [FIL] Ayusin ang listahan ng file ayon sa petsa ng pagkagawa mula pinakaluma.
+
+  04.06 Change folder view
+  Expected: Set the named Explorer view, adjusting compact spacing for the last two cases.
+    0351 [TG] Change mo ang folder view to extra large icons.
+    0352 [EN] Set this folder's view to large icons.
+    0353 [FIL] Ipakita ang folder na ito gamit ang medium icons view.
+    0354 [TG] Change mo ang folder view to small icons.
+    0355 [EN] Set this folder's view to list.
+    0356 [FIL] Ipakita ang folder na ito gamit ang details view.
+    0357 [TG] Change mo ang folder view to tiles.
+    0358 [EN] Set this folder's view to content.
+    0359 [FIL] Ipakita ang folder na ito gamit ang details with compact spacing view.
+    0360 [TG] Change mo ang folder view to details with standard spacing.
+
+  04.07 Copy selected file
+  Expected: Copy the selected fixture file to the named folder and confirm any overwrite separately.
+    0361 [EN] Copy the selected file to Downloads.
+    0362 [FIL] Kopyahin ang napiling file sa Documents.
+    0363 [TG] Copy mo yung selected file sa Desktop.
+    0364 [EN] Copy the selected file to Pictures.
+    0365 [FIL] Kopyahin ang napiling file sa Videos.
+    0366 [TG] Copy mo yung selected file sa Music.
+    0367 [EN] Copy the selected file to Work.
+    0368 [FIL] Kopyahin ang napiling file sa Archive.
+    0369 [TG] Copy mo yung selected file sa Study.
+    0370 [EN] Copy the selected file to Reports.
+
+  04.08 Move selected file
+  Expected: Preview the destination and move the selected fixture file on approval.
+    0371 [FIL] Ilipat ang napiling file sa Documents.
+    0372 [TG] Move mo yung selected file sa Desktop.
+    0373 [EN] Move the selected file to Pictures.
+    0374 [FIL] Ilipat ang napiling file sa Downloads.
+    0375 [TG] Move mo yung selected file sa Videos.
+    0376 [EN] Move the selected file to Music.
+    0377 [FIL] Ilipat ang napiling file sa Work.
+    0378 [TG] Move mo yung selected file sa Archive.
+    0379 [EN] Move the selected file to Study.
+    0380 [FIL] Ilipat ang napiling file sa Reports.
+
+  04.09 Rename selected file
+  Expected: Preview the new name and preserve the original extension unless explicitly changed.
+    0381 [TG] Rename mo yung file as Meeting Notes with the same extension.
+    0382 [EN] Rename the selected file to Final Report and keep its extension.
+    0383 [FIL] Palitan ang pangalan ng file ng Budget Draft at panatilihin ang extension.
+    0384 [TG] Rename mo yung file as Trip Photos with the same extension.
+    0385 [EN] Rename the selected file to Reading List and keep its extension.
+    0386 [FIL] Palitan ang pangalan ng file ng Class Outline at panatilihin ang extension.
+    0387 [TG] Rename mo yung file as Receipts 2026 with the same extension.
+    0388 [EN] Rename the selected file to Project Summary and keep its extension.
+    0389 [FIL] Palitan ang pangalan ng file ng Sample Data at panatilihin ang extension.
+    0390 [TG] Rename mo yung file as Weekly Plan with the same extension.
+
+  04.10 Recycle file
+  Expected: Show the exact path and move the fixture to Recycle Bin after approval.
+    0391 [EN] Move Old Draft.txt to the Recycle Bin.
+    0392 [FIL] Ilipat ang Duplicate Photo.jpg sa Recycle Bin.
+    0393 [TG] Send mo ang Temp Export.csv sa Recycle Bin.
+    0394 [EN] Move Extra Notes.txt to the Recycle Bin.
+    0395 [FIL] Ilipat ang Test Clip.mp4 sa Recycle Bin.
+    0396 [TG] Send mo ang Demo Slides.pptx sa Recycle Bin.
+    0397 [EN] Move Outdated List.xlsx to the Recycle Bin.
+    0398 [FIL] Ilipat ang Blank Scan.pdf sa Recycle Bin.
+    0399 [TG] Send mo ang Spare Copy.docx sa Recycle Bin.
+    0400 [EN] Move Unused Mockup.png to the Recycle Bin.
+
+05 | Browser navigation
+
+  05.01 Open exact URL
+  Expected: Open the explicit HTTPS address in the chosen browser.
+    0401 [FIL] Buksan sa browser ang https://example.com.
+    0402 [TG] Open mo ang https://www.wikipedia.org sa browser.
+    0403 [EN] Go to https://docs.rs in my browser.
+    0404 [FIL] Buksan sa browser ang https://crates.io.
+    0405 [TG] Open mo ang https://www.rust-lang.org sa browser.
+    0406 [EN] Go to https://learn.microsoft.com in my browser.
+    0407 [FIL] Buksan sa browser ang https://developer.mozilla.org.
+    0408 [TG] Open mo ang https://www.openstreetmap.org sa browser.
+    0409 [EN] Go to https://www.gutenberg.org in my browser.
+    0410 [FIL] Buksan sa browser ang https://www.archive.org.
+
+  05.02 Search publicly
+  Expected: Open a browser search page for the explicit public query.
+    0411 [TG] I-search mo sa browser ang rainy day activities.
+    0412 [EN] Search the web for Filipino proverbs.
+    0413 [FIL] Hanapin sa web ang indoor plants.
+    0414 [TG] I-search mo sa browser ang beginner Rust examples.
+    0415 [EN] Search the web for easy merienda recipes.
+    0416 [FIL] Hanapin sa web ang public domain novels.
+    0417 [TG] I-search mo sa browser ang drawing exercises.
+    0418 [EN] Search the web for water cycle diagram.
+    0419 [FIL] Hanapin sa web ang keyboard accessibility.
+    0420 [TG] I-search mo sa browser ang Tagalog tongue twisters.
+
+  05.03 Open new tab
+  Expected: Open the specified destination in a separate new tab.
+    0421 [EN] Open https://example.com in a new tab.
+    0422 [FIL] Buksan ang https://www.wikipedia.org sa bagong tab.
+    0423 [TG] Open mo ang https://docs.rs sa new tab.
+    0424 [EN] Open https://crates.io in a new tab.
+    0425 [FIL] Buksan ang https://www.rust-lang.org sa bagong tab.
+    0426 [TG] Open mo ang https://learn.microsoft.com sa new tab.
+    0427 [EN] Open https://developer.mozilla.org in a new tab.
+    0428 [FIL] Buksan ang https://www.openstreetmap.org sa bagong tab.
+    0429 [TG] Open mo ang https://www.gutenberg.org sa new tab.
+    0430 [EN] Open https://www.archive.org in a new tab.
+
+  05.04 Switch tab
+  Expected: Select the exact visible tab or show a picker for duplicate titles.
+    0431 [FIL] Lumipat sa browser tab na Search Results.
+    0432 [TG] Switch mo sa tab named Amica Manual.
+    0433 [EN] Switch to the browser tab titled Recipes.
+    0434 [FIL] Lumipat sa browser tab na Rust Book.
+    0435 [TG] Switch mo sa tab named Calendar.
+    0436 [EN] Switch to the browser tab titled Reading List.
+    0437 [FIL] Lumipat sa browser tab na Project Board.
+    0438 [TG] Switch mo sa tab named Draft Preview.
+    0439 [EN] Switch to the browser tab titled Docs.
+    0440 [FIL] Lumipat sa browser tab na Local Demo.
+
+  05.05 Find within page
+  Expected: Use the browser's find control for the supplied visible search phrase.
+    0441 [TG] Find mo ang “installation” sa page na ito.
+    0442 [EN] Find “privacy” on this page.
+    0443 [FIL] Hanapin ang “terms” sa pahinang ito.
+    0444 [TG] Find mo ang “examples” sa page na ito.
+    0445 [EN] Find “ingredients” on this page.
+    0446 [FIL] Hanapin ang “chapter one” sa pahinang ito.
+    0447 [TG] Find mo ang “keyboard” sa page na ito.
+    0448 [EN] Find “screensaver” on this page.
+    0449 [FIL] Hanapin ang “accessibility” sa pahinang ito.
+    0450 [TG] Find mo ang “release notes” sa page na ito.
+
+  05.06 Set page zoom
+  Expected: Adjust zoom in the active browser tab and report the actual percentage.
+    0451 [EN] Set browser zoom to 50%.
+    0452 [FIL] Itakda ang browser zoom sa 67%.
+    0453 [TG] Set mo yung browser zoom to 75%.
+    0454 [EN] Set browser zoom to 80%.
+    0455 [FIL] Itakda ang browser zoom sa 90%.
+    0456 [TG] Set mo yung browser zoom to 100%.
+    0457 [EN] Set browser zoom to 110%.
+    0458 [FIL] Itakda ang browser zoom sa 125%.
+    0459 [TG] Set mo yung browser zoom to 150%.
+    0460 [EN] Set browser zoom to 175%.
+
+  05.07 Go back through history
+  Expected: Navigate backward by the requested bounded number of entries or stop at the beginning.
+    0461 [FIL] Bumalik nang isang pahina sa history ng tab na ito.
+    0462 [TG] Go back by two pages sa tab history.
+    0463 [EN] Go three pages back in this tab's history.
+    0464 [FIL] Bumalik nang apat na pahina sa history ng tab na ito.
+    0465 [TG] Go back by five pages sa tab history.
+    0466 [EN] Go six pages back in this tab's history.
+    0467 [FIL] Bumalik nang pitong pahina sa history ng tab na ito.
+    0468 [TG] Go back by eight pages sa tab history.
+    0469 [EN] Go nine pages back in this tab's history.
+    0470 [FIL] Bumalik nang sampung pahina sa history ng tab na ito.
+
+  05.08 Go forward through history
+  Expected: Navigate forward up to the requested count if entries are available.
+    0471 [TG] Go forward by one page sa tab history.
+    0472 [EN] Go two pages forward in this tab's history.
+    0473 [FIL] Sumulong nang tatlong pahina sa history ng tab na ito.
+    0474 [TG] Go forward by four pages sa tab history.
+    0475 [EN] Go five pages forward in this tab's history.
+    0476 [FIL] Sumulong nang anim na pahina sa history ng tab na ito.
+    0477 [TG] Go forward by seven pages sa tab history.
+    0478 [EN] Go eight pages forward in this tab's history.
+    0479 [FIL] Sumulong nang siyam na pahina sa history ng tab na ito.
+    0480 [TG] Go forward by ten pages sa tab history.
+
+  05.09 Bookmark current page
+  Expected: Show the current page URL and save a bookmark with the supplied name.
+    0481 [EN] Bookmark this page as Rust Guide.
+    0482 [FIL] I-bookmark ang pahinang ito bilang Reference.
+    0483 [TG] Bookmark mo itong page as Amica Docs.
+    0484 [EN] Bookmark this page as Images.
+    0485 [FIL] I-bookmark ang pahinang ito bilang Class Portal.
+    0486 [TG] Bookmark mo itong page as Recipes.
+    0487 [EN] Bookmark this page as Work Notes.
+    0488 [FIL] I-bookmark ang pahinang ito bilang Reading Queue.
+    0489 [TG] Bookmark mo itong page as Travel Map.
+    0490 [EN] Bookmark this page as Weekend Ideas.
+
+  05.10 Open most recent tabs from history
+  Expected: Preview the requested number of recent history entries and open the selected batch in order.
+    0491 [FIL] Ipakita at muling buksan ang hanggang isang pahina mula sa history.
+    0492 [TG] Preview and reopen up to two pages from my browser history.
+    0493 [EN] Show me and reopen up to three pages from recent browser history.
+    0494 [FIL] Ipakita at muling buksan ang hanggang apat na pahina mula sa history.
+    0495 [TG] Preview and reopen up to five pages from my browser history.
+    0496 [EN] Show me and reopen up to six pages from recent browser history.
+    0497 [FIL] Ipakita at muling buksan ang hanggang pitong pahina mula sa history.
+    0498 [TG] Preview and reopen up to eight pages from my browser history.
+    0499 [EN] Show me and reopen up to nine pages from recent browser history.
+    0500 [FIL] Ipakita at muling buksan ang hanggang sampung pahina mula sa history.
+
+06 | Editing and clipboard
+
+  06.01 Set local clipboard
+  Expected: Copy the supplied literal to the local clipboard and clear any in-app preview.
+    0501 [TG] Copy mo sa clipboard ang “Ready for review”.
+    0502 [EN] Copy “Meeting moved to Friday” to my clipboard.
+    0503 [FIL] Kopyahin ang “Draft version 2” sa clipboard ko.
+    0504 [TG] Copy mo sa clipboard ang “New plan”.
+    0505 [EN] Copy “Salamat sa tulong” to my clipboard.
+    0506 [FIL] Kopyahin ang “Please check the numbers” sa clipboard ko.
+    0507 [TG] Copy mo sa clipboard ang “Follow up next week”.
+    0508 [EN] Copy “Bukas na lang” to my clipboard.
+    0509 [FIL] Kopyahin ang “Checklist complete” sa clipboard ko.
+    0510 [TG] Copy mo sa clipboard ang “Sample input”.
+
+  06.02 Paste into a field
+  Expected: Confirm the specifically named destination, focus it, and paste locally.
+    0511 [EN] Paste my clipboard into the Notepad draft.
+    0512 [FIL] I-paste ang nasa clipboard sa the browser address bar.
+    0513 [TG] Paste mo yung clipboard sa the Explorer search box.
+    0514 [EN] Paste my clipboard into the file name field.
+    0515 [FIL] I-paste ang nasa clipboard sa the sample comment field.
+    0516 [TG] Paste mo yung clipboard sa the sample chat draft.
+    0517 [EN] Paste my clipboard into the wiki search box.
+    0518 [FIL] I-paste ang nasa clipboard sa the Notes title field.
+    0519 [TG] Paste mo yung clipboard sa the demo form address field.
+    0520 [EN] Paste my clipboard into the spreadsheet formula bar.
+
+  06.03 Copy window title
+  Expected: Copy only the resolved window's title locally.
+    0521 [FIL] Kopyahin ang pamagat ng window ng Notepad.
+    0522 [TG] Copy mo ang File Explorer window title.
+    0523 [EN] Copy the title of the Paint window.
+    0524 [FIL] Kopyahin ang pamagat ng window ng Photos.
+    0525 [TG] Copy mo ang Microsoft Edge window title.
+    0526 [EN] Copy the title of the Settings window.
+    0527 [FIL] Kopyahin ang pamagat ng window ng Word.
+    0528 [TG] Copy mo ang Excel window title.
+    0529 [EN] Copy the title of the PowerPoint window.
+    0530 [FIL] Kopyahin ang pamagat ng window ng Task Manager.
+
+  06.04 Open in Notepad
+  Expected: Open the exact text file from the test workspace for editing.
+    0531 [TG] Open mo sa Notepad ang Draft.txt.
+    0532 [EN] Open Shopping.txt in Notepad.
+    0533 [FIL] Buksan ang Packing.txt sa Notepad.
+    0534 [TG] Open mo sa Notepad ang Notes.txt.
+    0535 [EN] Open Review.txt in Notepad.
+    0536 [FIL] Buksan ang Plan.txt sa Notepad.
+    0537 [TG] Open mo sa Notepad ang Journal.txt.
+    0538 [EN] Open Sample.csv in Notepad.
+    0539 [FIL] Buksan ang Checklist.txt sa Notepad.
+    0540 [TG] Open mo sa Notepad ang Ideas.txt.
+
+  06.05 New named text document
+  Expected: Open a new draft with the requested name and show where it will be saved.
+    0541 [EN] Start a new text document named Daily Log.
+    0542 [FIL] Gumawa ng bagong text document na Bug Notes.
+    0543 [TG] New text document na Meeting Outline.
+    0544 [EN] Start a new text document named Short Story.
+    0545 [FIL] Gumawa ng bagong text document na Study Summary.
+    0546 [TG] New text document na Practice Lines.
+    0547 [EN] Start a new text document named Recipe Notes.
+    0548 [FIL] Gumawa ng bagong text document na Task List.
+    0549 [TG] New text document na Scratch Pad.
+    0550 [EN] Start a new text document named Trip Draft.
+
+  06.06 Find text in editor
+  Expected: Invoke the editor's find UI and search for a literal string.
+    0551 [FIL] Hanapin ang “summary” sa dokumentong ito.
+    0552 [TG] Find mo ang “next step” sa document.
+    0553 [EN] Find “todo” in this document.
+    0554 [FIL] Hanapin ang “urgent” sa dokumentong ito.
+    0555 [TG] Find mo ang “title” sa document.
+    0556 [EN] Find “due date” in this document.
+    0557 [FIL] Hanapin ang “owner” sa dokumentong ito.
+    0558 [TG] Find mo ang “open question” sa document.
+    0559 [EN] Find “references” in this document.
+    0560 [FIL] Hanapin ang “appendix” sa dokumentong ito.
+
+  06.07 Replace selected text
+  Expected: Replace the current selection in an editable fixture and leave it undoable.
+    0561 [TG] Replace mo yung selection with “Approved”.
+    0562 [EN] Replace the selected text with “Needs review”.
+    0563 [FIL] Palitan ang napiling teksto ng “Next Monday”.
+    0564 [TG] Replace mo yung selection with “Mabuhay”.
+    0565 [EN] Replace the selected text with “Thirty minutes”.
+    0566 [FIL] Palitan ang napiling teksto ng “Question for later”.
+    0567 [TG] Replace mo yung selection with “Version 3”.
+    0568 [EN] Replace the selected text with “Keep this section”.
+    0569 [FIL] Palitan ang napiling teksto ng “Ready to send”.
+    0570 [TG] Replace mo yung selection with “Updated estimate”.
+
+  06.08 Change text case
+  Expected: Transform the selection locally in a compatible editor and preserve undo.
+    0571 [EN] Convert the selected text to uppercase.
+    0572 [FIL] Gawing lowercase ang napiling teksto.
+    0573 [TG] Convert mo yung selection to title case.
+    0574 [EN] Convert the selected text to sentence case.
+    0575 [FIL] Gawing swap case ang napiling teksto.
+    0576 [TG] Convert mo yung selection to capitalized lines.
+    0577 [EN] Convert the selected text to lowercase initials.
+    0578 [FIL] Gawing uppercase initials ang napiling teksto.
+    0579 [TG] Convert mo yung selection to PascalCase.
+    0580 [EN] Convert the selected text to snake_case.
+
+  06.09 Save a copy
+  Expected: Show the destination for a copy and ask separately before overwriting.
+    0581 [FIL] Mag-save ng kopya ng dokumentong ito bilang Clean Draft.txt.
+    0582 [TG] Save a copy nito as Study Notes Copy.txt.
+    0583 [EN] Save a copy of this text document as Meeting Draft.txt.
+    0584 [FIL] Mag-save ng kopya ng dokumentong ito bilang Outline Copy.txt.
+    0585 [TG] Save a copy nito as QA Output.txt.
+    0586 [EN] Save a copy of this text document as Review Copy.txt.
+    0587 [FIL] Mag-save ng kopya ng dokumentong ito bilang Friday Plan.txt.
+    0588 [TG] Save a copy nito as Backup Notes.txt.
+    0589 [EN] Save a copy of this text document as Summary Copy.txt.
+    0590 [FIL] Mag-save ng kopya ng dokumentong ito bilang Working Copy.txt.
+
+  06.10 Insert repeated line break
+  Expected: Insert the requested count of newline characters into a focused multiline editor.
+    0591 [TG] Insert mo dito ang one line break.
+    0592 [EN] Insert two line breaks here.
+    0593 [FIL] Magdagdag dito ng tatlong line break.
+    0594 [TG] Insert mo dito ang four line breaks.
+    0595 [EN] Insert five line breaks here.
+    0596 [FIL] Magdagdag dito ng anim na line break.
+    0597 [TG] Insert mo dito ang seven line breaks.
+    0598 [EN] Insert eight line breaks here.
+    0599 [FIL] Magdagdag dito ng siyam na line break.
+    0600 [TG] Insert mo dito ang ten line breaks.
+
+07 | Windows audio, displays, and settings
+
+  07.01 Set master volume
+  Expected: Set Windows master volume and report the resulting level.
+    0601 [EN] Set Windows volume to 5%.
+    0602 [FIL] Itakda ang lakas ng tunog sa 10%.
+    0603 [TG] Set mo ang volume to 15%.
+    0604 [EN] Set Windows volume to 20%.
+    0605 [FIL] Itakda ang lakas ng tunog sa 25%.
+    0606 [TG] Set mo ang volume to 30%.
+    0607 [EN] Set Windows volume to 40%.
+    0608 [FIL] Itakda ang lakas ng tunog sa 50%.
+    0609 [TG] Set mo ang volume to 65%.
+    0610 [EN] Set Windows volume to 80%.
+
+  07.02 Adjust master volume
+  Expected: Change Windows master volume by the requested number of percentage points.
+    0611 [FIL] Baguhin ang lakas ng tunog nang 5 puntos pataas.
+    0612 [TG] Adjust mo ang Windows volume up 10 percentage points.
+    0613 [EN] Adjust Windows volume up 15 percentage points.
+    0614 [FIL] Baguhin ang lakas ng tunog nang 20 puntos pataas.
+    0615 [TG] Adjust mo ang Windows volume up 25 percentage points.
+    0616 [EN] Adjust Windows volume down 5 percentage points.
+    0617 [FIL] Baguhin ang lakas ng tunog nang 10 puntos pababa.
+    0618 [TG] Adjust mo ang Windows volume down 15 percentage points.
+    0619 [EN] Adjust Windows volume down 20 percentage points.
+    0620 [FIL] Baguhin ang lakas ng tunog nang 25 puntos pababa.
+
+  07.03 Set app volume
+  Expected: Set the named running app's audio session to 30 percent.
+    0621 [TG] Set mo ang Microsoft Edge volume to 30%.
+    0622 [EN] Set Spotify volume to 30%.
+    0623 [FIL] Itakda sa 30% ang lakas ng tunog ng VLC.
+    0624 [TG] Set mo ang Firefox volume to 30%.
+    0625 [EN] Set Chrome volume to 30%.
+    0626 [FIL] Itakda sa 30% ang lakas ng tunog ng Media Player.
+    0627 [TG] Set mo ang Discord volume to 30%.
+    0628 [EN] Set Teams volume to 30%.
+    0629 [FIL] Itakda sa 30% ang lakas ng tunog ng Zoom.
+    0630 [TG] Set mo ang Audacity volume to 30%.
+
+  07.04 Mute app
+  Expected: Mute the specified existing audio session and leave other sessions audible.
+    0631 [EN] Mute Microsoft Edge in the Windows mixer.
+    0632 [FIL] Patahimikin ang Spotify sa Windows mixer.
+    0633 [TG] I-mute mo yung VLC lang sa mixer.
+    0634 [EN] Mute Firefox in the Windows mixer.
+    0635 [FIL] Patahimikin ang Chrome sa Windows mixer.
+    0636 [TG] I-mute mo yung Media Player lang sa mixer.
+    0637 [EN] Mute Discord in the Windows mixer.
+    0638 [FIL] Patahimikin ang Teams sa Windows mixer.
+    0639 [TG] I-mute mo yung Zoom lang sa mixer.
+    0640 [EN] Mute Audacity in the Windows mixer.
+
+  07.05 Select system audio output
+  Expected: Show matching output endpoints and select the named device if available.
+    0641 [FIL] Ilipat ang tunog ng Windows sa Speakers.
+    0642 [TG] Switch mo ang Windows audio output to USB Headset.
+    0643 [EN] Switch Windows sound output to Bluetooth Headphones.
+    0644 [FIL] Ilipat ang tunog ng Windows sa Monitor Audio.
+    0645 [TG] Switch mo ang Windows audio output to Dock Speakers.
+    0646 [EN] Switch Windows sound output to USB DAC.
+    0647 [FIL] Ilipat ang tunog ng Windows sa HDMI TV.
+    0648 [TG] Switch mo ang Windows audio output to Studio Interface.
+    0649 [EN] Switch Windows sound output to Conference Speaker.
+    0650 [FIL] Ilipat ang tunog ng Windows sa Wired Headphones.
+
+  07.06 Set screen brightness
+  Expected: Set brightness on the selected display when Windows or the monitor supports it.
+    0651 [TG] Set mo yung screen brightness to 10%.
+    0652 [EN] Set this display's brightness to 20%.
+    0653 [FIL] Itakda sa 30% ang liwanag ng screen na ito.
+    0654 [TG] Set mo yung screen brightness to 40%.
+    0655 [EN] Set this display's brightness to 50%.
+    0656 [FIL] Itakda sa 60% ang liwanag ng screen na ito.
+    0657 [TG] Set mo yung screen brightness to 70%.
+    0658 [EN] Set this display's brightness to 80%.
+    0659 [FIL] Itakda sa 90% ang liwanag ng screen na ito.
+    0660 [TG] Set mo yung screen brightness to 100%.
+
+  07.07 Open Windows settings page
+  Expected: Open the named Windows settings page and leave its toggles untouched.
+    0661 [EN] Show me Windows settings for Wi-Fi.
+    0662 [FIL] Ipakita ang mga setting ng Windows para sa Bluetooth.
+    0663 [TG] Open mo yung Windows settings for Display.
+    0664 [EN] Show me Windows settings for Sound.
+    0665 [FIL] Ipakita ang mga setting ng Windows para sa Battery.
+    0666 [TG] Open mo yung Windows settings for Notifications.
+    0667 [EN] Show me Windows settings for Keyboard.
+    0668 [FIL] Ipakita ang mga setting ng Windows para sa Mouse.
+    0669 [TG] Open mo yung Windows settings for Date and time.
+    0670 [EN] Show me Windows settings for Accessibility.
+
+  07.08 Show resource usage
+  Expected: Display the requested locally available metric or report unavailable.
+    0671 [FIL] Ipakita ang gamit ng CPU ng PC na ito.
+    0672 [TG] Show mo yung memory usage ng PC.
+    0673 [EN] Show me download rate on this PC.
+    0674 [FIL] Ipakita ang bilis ng upload ng PC na ito.
+    0675 [TG] Show mo yung battery percentage ng PC.
+    0676 [EN] Show me free disk space on this PC.
+    0677 [FIL] Ipakita ang kasalukuyang pinagmumulan ng kuryente ng PC na ito.
+    0678 [TG] Show mo yung display resolution ng PC.
+    0679 [EN] Show me number of connected monitors on this PC.
+    0680 [FIL] Ipakita ang default na audio output ng PC na ito.
+
+  07.09 Switch output and set volume
+  Expected: Preview the audio endpoint and set it to 25 percent after switching.
+    0681 [TG] Switch to Speakers at 25% volume.
+    0682 [EN] Use USB Headset and set it to 25% volume.
+    0683 [FIL] Gamitin ang Bluetooth Headphones at itakda sa 25% ang tunog.
+    0684 [TG] Switch to Monitor Audio at 25% volume.
+    0685 [EN] Use Dock Speakers and set it to 25% volume.
+    0686 [FIL] Gamitin ang USB DAC at itakda sa 25% ang tunog.
+    0687 [TG] Switch to HDMI TV at 25% volume.
+    0688 [EN] Use Studio Interface and set it to 25% volume.
+    0689 [FIL] Gamitin ang Conference Speaker at itakda sa 25% ang tunog.
+    0690 [TG] Switch to Wired Headphones at 25% volume.
+
+  07.10 Show display setting
+  Expected: Open the relevant settings surface and focus the named area when available.
+    0691 [EN] Show me where to change resolution.
+    0692 [FIL] Ipakita kung saan mababago ang display scaling.
+    0693 [TG] Show me yung setting for orientation.
+    0694 [EN] Show me where to change refresh rate.
+    0695 [FIL] Ipakita kung saan mababago ang Night Light schedule.
+    0696 [TG] Show me yung setting for display arrangement.
+    0697 [EN] Show me where to change the primary monitor.
+    0698 [FIL] Ipakita kung saan mababago ang HDR.
+    0699 [TG] Show me yung setting for color profile.
+    0700 [EN] Show me where to change screen timeout.
+
+08 | Accessibility and local screen tools
+
+  08.01 Activate by role with index
+  Expected: Select the numbered accessible item of the specified role in the active surface and invoke it when supported.
+    0701 [FIL] I-activate ang first check box sa window na ito.
+    0702 [TG] Activate mo yung second check box sa window na ito.
+    0703 [EN] Activate the first link in this window.
+    0704 [FIL] I-activate ang second link sa window na ito.
+    0705 [TG] Activate mo yung third link sa window na ito.
+    0706 [EN] Activate the fourth link in this window.
+    0707 [FIL] I-activate ang first button sa window na ito.
+    0708 [TG] Activate mo yung second button sa window na ito.
+    0709 [EN] Activate the first menu item in this window.
+    0710 [FIL] I-activate ang second menu item sa window na ito.
+
+  08.02 Read focused property
+  Expected: Display the requested accessibility property of the focused control locally.
+    0711 [TG] Show mo ang name ng focused control.
+    0712 [EN] Show the focused control's role.
+    0713 [FIL] Ipakita ang enabled state ng kasalukuyang control.
+    0714 [TG] Show mo ang help text ng focused control.
+    0715 [EN] Show the focused control's checked state.
+    0716 [FIL] Ipakita ang keyboard shortcut ng kasalukuyang control.
+    0717 [TG] Show mo ang position ng focused control.
+    0718 [EN] Show the focused control's size.
+    0719 [FIL] Ipakita ang expanded state ng kasalukuyang control.
+    0720 [TG] Show mo ang range value ng focused control.
+
+  08.03 Toggle named control
+  Expected: Toggle the uniquely matched control in the UI test fixture and read the resulting state.
+    0721 [EN] Toggle the option labeled Word wrap.
+    0722 [FIL] I-toggle ang opsyong Show line numbers.
+    0723 [TG] Toggle mo yung option na Large text.
+    0724 [EN] Toggle the option labeled Reduced motion.
+    0725 [FIL] I-toggle ang opsyong High contrast.
+    0726 [TG] Toggle mo yung option na Show preview.
+    0727 [EN] Toggle the option labeled Format marks.
+    0728 [FIL] I-toggle ang opsyong Read-only view.
+    0729 [TG] Toggle mo yung option na Grid lines.
+    0730 [EN] Toggle the option labeled Automatic captions.
+
+  08.04 Expand named region
+  Expected: Expand the uniquely matched collapsible test region.
+    0731 [FIL] Palawakin ang File details.
+    0732 [TG] I-expand mo yung Advanced options.
+    0733 [EN] Expand Recent items.
+    0734 [FIL] Palawakin ang Filter options.
+    0735 [TG] I-expand mo yung Folder tree.
+    0736 [EN] Expand Network adapters.
+    0737 [FIL] Palawakin ang Output devices.
+    0738 [TG] I-expand mo yung Language options.
+    0739 [EN] Expand More actions.
+    0740 [FIL] Palawakin ang Additional info.
+
+  08.05 Collapse named region
+  Expected: Collapse the uniquely matched test region and preserve its focus when possible.
+    0741 [TG] I-collapse mo yung File details.
+    0742 [EN] Collapse Advanced options.
+    0743 [FIL] Tiklopin ang Recent items.
+    0744 [TG] I-collapse mo yung Filter options.
+    0745 [EN] Collapse Folder tree.
+    0746 [FIL] Tiklopin ang Network adapters.
+    0747 [TG] I-collapse mo yung Output devices.
+    0748 [EN] Collapse Language options.
+    0749 [FIL] Tiklopin ang More actions.
+    0750 [TG] I-collapse mo yung Additional info.
+
+  08.06 Magnify desktop
+  Expected: Set Windows Magnifier zoom and report the setting Windows applies.
+    0751 [EN] Set Windows Magnifier to 100%.
+    0752 [FIL] Itakda ang Windows Magnifier sa 125%.
+    0753 [TG] Set mo ang Magnifier to 150%.
+    0754 [EN] Set Windows Magnifier to 175%.
+    0755 [FIL] Itakda ang Windows Magnifier sa 200%.
+    0756 [TG] Set mo ang Magnifier to 225%.
+    0757 [EN] Set Windows Magnifier to 250%.
+    0758 [FIL] Itakda ang Windows Magnifier sa 300%.
+    0759 [TG] Set mo ang Magnifier to 350%.
+    0760 [EN] Set Windows Magnifier to 400%.
+
+  08.07 Set grid size
+  Expected: Show an overlay for the requested monitor grid and number its cells locally.
+    0761 [FIL] Ipakita ang 2 by 3 na grid para sa mouse.
+    0762 [TG] Show mo yung 3 by 3 mouse grid.
+    0763 [EN] Show a 3 by 4 mouse grid.
+    0764 [FIL] Ipakita ang 4 by 4 na grid para sa mouse.
+    0765 [TG] Show mo yung 4 by 5 mouse grid.
+    0766 [EN] Show a 5 by 5 mouse grid.
+    0767 [FIL] Ipakita ang 5 by 6 na grid para sa mouse.
+    0768 [TG] Show mo yung 6 by 6 mouse grid.
+    0769 [EN] Show a 6 by 7 mouse grid.
+    0770 [FIL] Ipakita ang 7 by 7 na grid para sa mouse.
+
+  08.08 Capture named window locally
+  Expected: Preview and save a screenshot of the named capturable window in the local fixture folder.
+    0771 [TG] Screenshot mo ang Notepad locally.
+    0772 [EN] Take a local screenshot of File Explorer.
+    0773 [FIL] Kumuha ng screenshot ng Paint at itago rito sa PC.
+    0774 [TG] Screenshot mo ang Photos locally.
+    0775 [EN] Take a local screenshot of Microsoft Edge.
+    0776 [FIL] Kumuha ng screenshot ng Settings at itago rito sa PC.
+    0777 [TG] Screenshot mo ang Word locally.
+    0778 [EN] Take a local screenshot of Excel.
+    0779 [FIL] Kumuha ng screenshot ng Calculator at itago rito sa PC.
+    0780 [TG] Screenshot mo ang Clock locally.
+
+  08.09 Show accessible list items
+  Expected: Display at most the requested count of accessible entries in the active list without cloud transfer.
+    0781 [EN] Show me the first 1 accessible items in this list.
+    0782 [FIL] Ipakita ang unang 2 item sa listahang ito.
+    0783 [TG] Show mo yung first 3 accessible items dito.
+    0784 [EN] Show me the first 4 accessible items in this list.
+    0785 [FIL] Ipakita ang unang 5 item sa listahang ito.
+    0786 [TG] Show mo yung first 6 accessible items dito.
+    0787 [EN] Show me the first 7 accessible items in this list.
+    0788 [FIL] Ipakita ang unang 8 item sa listahang ito.
+    0789 [TG] Show mo yung first 9 accessible items dito.
+    0790 [EN] Show me the first 10 accessible items in this list.
+
+  08.10 Flash pointer location
+  Expected: Briefly show a local high-contrast pointer marker in the chosen style.
+    0791 [FIL] Markahan ang cursor gamit ang white ring.
+    0792 [TG] Highlight mo ang cursor with black ring.
+    0793 [EN] Highlight my pointer with a cyan ring.
+    0794 [FIL] Markahan ang cursor gamit ang yellow ring.
+    0795 [TG] Highlight mo ang cursor with purple ring.
+    0796 [EN] Highlight my pointer with a dashed circle.
+    0797 [FIL] Markahan ang cursor gamit ang crosshairs.
+    0798 [TG] Highlight mo ang cursor with large square.
+    0799 [EN] Highlight my pointer with a small square.
+    0800 [FIL] Markahan ang cursor gamit ang pulsing ring.
+
+09 | Desktop media and music
+
+  09.01 Open local media file
+  Expected: Open the named fixture media file in its registered player.
+    0801 [TG] Play mo yung local file na Piano.mp3.
+    0802 [EN] Play the local file Birds.wav.
+    0803 [FIL] Patugtugin ang file na Practice.ogg.
+    0804 [TG] Play mo yung local file na Roadtrip.mp4.
+    0805 [EN] Play the local file Sample.m4a.
+    0806 [FIL] Patugtugin ang file na Intro.flac.
+    0807 [TG] Play mo yung local file na Lesson.mp4.
+    0808 [EN] Play the local file Demo.webm.
+    0809 [FIL] Patugtugin ang file na Ambient.mp3.
+    0810 [TG] Play mo yung local file na Preview.wav.
+
+  09.02 Pause active player
+  Expected: Pause the uniquely available supported player without closing it.
+    0811 [EN] Pause playback in Spotify.
+    0812 [FIL] Ihinto muna ang pagtugtog sa VLC.
+    0813 [TG] Pause mo sa Media Player.
+    0814 [EN] Pause playback in Microsoft Edge.
+    0815 [FIL] Ihinto muna ang pagtugtog sa Firefox.
+    0816 [TG] Pause mo sa Chrome.
+    0817 [EN] Pause playback in YouTube in Amica.
+    0818 [FIL] Ihinto muna ang pagtugtog sa Spotify in Amica.
+    0819 [TG] Pause mo sa Apple Music.
+    0820 [EN] Pause playback in Audacity.
+
+  09.03 Resume player
+  Expected: Resume the named player from its current position when available.
+    0821 [FIL] Ipagpatuloy ang pagtugtog sa Spotify.
+    0822 [TG] Resume mo yung playback sa VLC.
+    0823 [EN] Resume playback in Media Player.
+    0824 [FIL] Ipagpatuloy ang pagtugtog sa Microsoft Edge.
+    0825 [TG] Resume mo yung playback sa Firefox.
+    0826 [EN] Resume playback in Chrome.
+    0827 [FIL] Ipagpatuloy ang pagtugtog sa YouTube in Amica.
+    0828 [TG] Resume mo yung playback sa Spotify in Amica.
+    0829 [EN] Resume playback in Apple Music.
+    0830 [FIL] Ipagpatuloy ang pagtugtog sa Audacity.
+
+  09.04 Seek relative in player
+  Expected: Seek the active compatible player by the requested time offset and report outcome.
+    0831 [TG] Seek mo 5 seconds forward sa player.
+    0832 [EN] Seek 10 seconds forward in the active player.
+    0833 [FIL] Ilipat ang playback nang 15 segundo pasulong.
+    0834 [TG] Seek mo 30 seconds forward sa player.
+    0835 [EN] Seek 60 seconds forward in the active player.
+    0836 [FIL] Ilipat ang playback nang 5 segundo pabalik.
+    0837 [TG] Seek mo 10 seconds back sa player.
+    0838 [EN] Seek 15 seconds back in the active player.
+    0839 [FIL] Ilipat ang playback nang 30 segundo pabalik.
+    0840 [TG] Seek mo 60 seconds back sa player.
+
+  09.05 Seek to timestamp
+  Expected: Seek the active compatible player to the timestamp or report that it exceeds the duration.
+    0841 [EN] Jump to 00:05 in this media file.
+    0842 [FIL] Tumalon sa oras na 00:10 sa file na ito.
+    0843 [TG] Jump ka to 00:15 sa current media.
+    0844 [EN] Jump to 00:30 in this media file.
+    0845 [FIL] Tumalon sa oras na 01:00 sa file na ito.
+    0846 [TG] Jump ka to 01:15 sa current media.
+    0847 [EN] Jump to 02:00 in this media file.
+    0848 [FIL] Tumalon sa oras na 03:30 sa file na ito.
+    0849 [TG] Jump ka to 05:00 sa current media.
+    0850 [EN] Jump to 10:00 in this media file.
+
+  09.06 Change playback rate
+  Expected: Set the playback rate on a compatible player or report unsupported values.
+    0851 [FIL] Itakda ang bilis ng playback sa 0.25x.
+    0852 [TG] Set mo yung playback speed to 0.5x.
+    0853 [EN] Set the active player's speed to 0.75x.
+    0854 [FIL] Itakda ang bilis ng playback sa 0.9x.
+    0855 [TG] Set mo yung playback speed to 1.0x.
+    0856 [EN] Set the active player's speed to 1.1x.
+    0857 [FIL] Itakda ang bilis ng playback sa 1.25x.
+    0858 [TG] Set mo yung playback speed to 1.5x.
+    0859 [EN] Set the active player's speed to 1.75x.
+    0860 [FIL] Itakda ang bilis ng playback sa 2.0x.
+
+  09.07 Find on YouTube
+  Expected: Open search results in the chosen YouTube surface for the supplied media query.
+    0861 [TG] I-search mo sa YouTube ang lo-fi for studying.
+    0862 [EN] Find Filipino folk songs on YouTube.
+    0863 [FIL] Hanapin ang rain on a roof sounds sa YouTube.
+    0864 [TG] I-search mo sa YouTube ang gentle piano practice.
+    0865 [EN] Find basic drawing tutorial on YouTube.
+    0866 [FIL] Hanapin ang Tagalog short stories sa YouTube.
+    0867 [TG] I-search mo sa YouTube ang ambient music for reading.
+    0868 [EN] Find beginner stretching routine on YouTube.
+    0869 [FIL] Hanapin ang paper craft tutorial sa YouTube.
+    0870 [TG] I-search mo sa YouTube ang city walk Manila.
+
+  09.08 Find on Spotify
+  Expected: Open Spotify search results with the supplied media query.
+    0871 [EN] Find OPM acoustic on Spotify.
+    0872 [FIL] Hanapin ang piano for reading sa Spotify.
+    0873 [TG] I-search mo sa Spotify ang instrumental jazz.
+    0874 [EN] Find lo-fi beats on Spotify.
+    0875 [FIL] Hanapin ang rainy day playlists sa Spotify.
+    0876 [TG] I-search mo sa Spotify ang Filipino history podcasts.
+    0877 [EN] Find beginner Spanish podcasts on Spotify.
+    0878 [FIL] Hanapin ang classical guitar sa Spotify.
+    0879 [TG] I-search mo sa Spotify ang synthwave instrumental.
+    0880 [EN] Find quiet focus playlists on Spotify.
+
+  09.09 Read media status
+  Expected: Display the requested property of the currently active player if exposed.
+    0881 [FIL] Ipakita ang track title ng kasalukuyang player.
+    0882 [TG] Show mo ang artist ng current player.
+    0883 [EN] Show the current player's album.
+    0884 [FIL] Ipakita ang elapsed time ng kasalukuyang player.
+    0885 [TG] Show mo ang duration ng current player.
+    0886 [EN] Show the current player's playback state.
+    0887 [FIL] Ipakita ang track number ng kasalukuyang player.
+    0888 [TG] Show mo ang player app name ng current player.
+    0889 [EN] Show the current player's playback speed.
+    0890 [FIL] Ipakita ang mute status ng kasalukuyang player.
+
+  09.10 Schedule pause
+  Expected: Create a local countdown that pauses the named active playback target on expiry.
+    0891 [TG] Pause this player after 1 minute.
+    0892 [EN] Pause this player in 3 minutes.
+    0893 [FIL] I-pause ang player pagkalipas ng 5 minuto.
+    0894 [TG] Pause this player after 10 minutes.
+    0895 [EN] Pause this player in 15 minutes.
+    0896 [FIL] I-pause ang player pagkalipas ng 20 minuto.
+    0897 [TG] Pause this player after 25 minutes.
+    0898 [EN] Pause this player in 30 minutes.
+    0899 [FIL] I-pause ang player pagkalipas ng 45 minuto.
+    0900 [TG] Pause this player after 60 minutes.
+
+10 | User-approved Windows routines
+
+  10.01 Run named routine
+  Expected: Resolve the named approved routine and run with its configured preview and permissions.
+    0901 [EN] Run my Focus routine.
+    0902 [FIL] Patakbuhin ang routine kong Study.
+    0903 [TG] Run mo ang Reading routine ko.
+    0904 [EN] Run my Writing routine.
+    0905 [FIL] Patakbuhin ang routine kong Class Prep.
+    0906 [TG] Run mo ang Daily Review routine ko.
+    0907 [EN] Run my Media Break routine.
+    0908 [FIL] Patakbuhin ang routine kong Research.
+    0909 [TG] Run mo ang Presentation routine ko.
+    0910 [EN] Run my End of Day routine.
+
+  10.02 Preview routine
+  Expected: Show the named routine's actions and targets in order for inspection.
+    0911 [FIL] Ipakita ang mga hakbang ng routine kong Focus.
+    0912 [TG] Preview mo yung steps ng Study routine ko.
+    0913 [EN] Preview the steps for my Reading routine.
+    0914 [FIL] Ipakita ang mga hakbang ng routine kong Writing.
+    0915 [TG] Preview mo yung steps ng Class Prep routine ko.
+    0916 [EN] Preview the steps for my Daily Review routine.
+    0917 [FIL] Ipakita ang mga hakbang ng routine kong Media Break.
+    0918 [TG] Preview mo yung steps ng Research routine ko.
+    0919 [EN] Preview the steps for my Presentation routine.
+    0920 [FIL] Ipakita ang mga hakbang ng routine kong End of Day.
+
+  10.03 Assign local shortcut
+  Expected: Open shortcut recording for the named routine, check conflicts, and save on acceptance.
+    0921 [TG] Set mo a shortcut for my Focus routine.
+    0922 [EN] Set a keyboard shortcut for my Study routine.
+    0923 [FIL] Magtakda ng shortcut para sa routine kong Reading.
+    0924 [TG] Set mo a shortcut for my Writing routine.
+    0925 [EN] Set a keyboard shortcut for my Class Prep routine.
+    0926 [FIL] Magtakda ng shortcut para sa routine kong Daily Review.
+    0927 [TG] Set mo a shortcut for my Media Break routine.
+    0928 [EN] Set a keyboard shortcut for my Research routine.
+    0929 [FIL] Magtakda ng shortcut para sa routine kong Presentation.
+    0930 [TG] Set mo a shortcut for my End of Day routine.
+
+  10.04 Create routine from current workspace
+  Expected: Offer to record current supported app identities and window positions under the supplied name.
+    0931 [EN] Save this window layout as Coding Desk.
+    0932 [FIL] I-save ang ayos ng mga window bilang Reading Desk.
+    0933 [TG] Save this layout as Budget Desk.
+    0934 [EN] Save this window layout as Drawing Desk.
+    0935 [FIL] I-save ang ayos ng mga window bilang Demo Desk.
+    0936 [TG] Save this layout as Study Desk.
+    0937 [EN] Save this window layout as Meeting Desk.
+    0938 [FIL] I-save ang ayos ng mga window bilang Editing Desk.
+    0939 [TG] Save this layout as Planning Desk.
+    0940 [EN] Save this window layout as Quiet Desk.
+
+  10.05 Restore saved workspace
+  Expected: Preview the supported apps and positions in the named saved layout and restore after acceptance.
+    0941 [FIL] Ibalik ang layout kong Coding Desk.
+    0942 [TG] Restore mo yung Reading Desk layout ko.
+    0943 [EN] Restore my Budget Desk layout.
+    0944 [FIL] Ibalik ang layout kong Drawing Desk.
+    0945 [TG] Restore mo yung Demo Desk layout ko.
+    0946 [EN] Restore my Study Desk layout.
+    0947 [FIL] Ibalik ang layout kong Meeting Desk.
+    0948 [TG] Restore mo yung Editing Desk layout ko.
+    0949 [EN] Restore my Planning Desk layout.
+    0950 [FIL] Ibalik ang layout kong Quiet Desk.
+
+  10.06 Add opening app to routine
+  Expected: Add a typed step for an installed app to the test routine and preview the change.
+    0951 [TG] Add an open-Notepad step sa Morning routine ko.
+    0952 [EN] Add a step to open Calculator in my Morning routine.
+    0953 [FIL] Idagdag sa routine kong Morning ang pagbukas ng File Explorer.
+    0954 [TG] Add an open-Paint step sa Morning routine ko.
+    0955 [EN] Add a step to open Photos in my Morning routine.
+    0956 [FIL] Idagdag sa routine kong Morning ang pagbukas ng Clock.
+    0957 [TG] Add an open-Microsoft Edge step sa Morning routine ko.
+    0958 [EN] Add a step to open Settings in my Morning routine.
+    0959 [FIL] Idagdag sa routine kong Morning ang pagbukas ng Word.
+    0960 [TG] Add an open-Excel step sa Morning routine ko.
+
+  10.07 Add a wait step
+  Expected: Add a bounded delay to the edited test routine and show the updated duration.
+    0961 [EN] Add a 1-second wait to my Break routine.
+    0962 [FIL] Magdagdag ng paghintay na 2 segundo sa routine kong Break.
+    0963 [TG] Add a 3-second wait step sa Break routine ko.
+    0964 [EN] Add a 5-second wait to my Break routine.
+    0965 [FIL] Magdagdag ng paghintay na 8 segundo sa routine kong Break.
+    0966 [TG] Add a 10-second wait step sa Break routine ko.
+    0967 [EN] Add a 15-second wait to my Break routine.
+    0968 [FIL] Magdagdag ng paghintay na 20 segundo sa routine kong Break.
+    0969 [TG] Add a 30-second wait step sa Break routine ko.
+    0970 [EN] Add a 60-second wait to my Break routine.
+
+  10.08 Remove routine step
+  Expected: Show the numbered step to be removed and save the edit on approval.
+    0971 [FIL] Alisin ang hakbang 1 sa routine kong Demo.
+    0972 [TG] Remove mo yung step 2 sa Demo routine ko.
+    0973 [EN] Remove step 3 from my Demo routine.
+    0974 [FIL] Alisin ang hakbang 4 sa routine kong Demo.
+    0975 [TG] Remove mo yung step 5 sa Demo routine ko.
+    0976 [EN] Remove step 6 from my Demo routine.
+    0977 [FIL] Alisin ang hakbang 7 sa routine kong Demo.
+    0978 [TG] Remove mo yung step 8 sa Demo routine ko.
+    0979 [EN] Remove step 9 from my Demo routine.
+    0980 [FIL] Alisin ang hakbang 10 sa routine kong Demo.
+
+  10.09 Duplicate routine
+  Expected: Copy the named routine into an editable draft with fresh shortcuts and approval settings.
+    0981 [TG] Duplicate mo yung routine named Focus.
+    0982 [EN] Duplicate the routine named Study.
+    0983 [FIL] Gumawa ng kopya ng routine na Reading.
+    0984 [TG] Duplicate mo yung routine named Writing.
+    0985 [EN] Duplicate the routine named Class Prep.
+    0986 [FIL] Gumawa ng kopya ng routine na Daily Review.
+    0987 [TG] Duplicate mo yung routine named Media Break.
+    0988 [EN] Duplicate the routine named Research.
+    0989 [FIL] Gumawa ng kopya ng routine na Presentation.
+    0990 [TG] Duplicate mo yung routine named End of Day.
+
+  10.10 Troubleshoot last run
+  Expected: Show steps, timing, completion, and redacted errors from the last run of the named routine.
+    0991 [EN] Show the last run of my Focus routine.
+    0992 [FIL] Ipakita ang huling pagpapatakbo ng routine kong Study.
+    0993 [TG] Show mo yung last run ng Reading routine ko.
+    0994 [EN] Show the last run of my Writing routine.
+    0995 [FIL] Ipakita ang huling pagpapatakbo ng routine kong Class Prep.
+    0996 [TG] Show mo yung last run ng Daily Review routine ko.
+    0997 [EN] Show the last run of my Media Break routine.
+    0998 [FIL] Ipakita ang huling pagpapatakbo ng routine kong Research.
+    0999 [TG] Show mo yung last run ng Presentation routine ko.
+    1000 [EN] Show the last run of my End of Day routine.
+
+11 | Conversation with Amica
+
+  11.01 Listen and reflect
+  Expected: Reflect the user's feelings and ask one gentle question without taking action.
+    1001 [FIL] Puwede ba nating pag-usapan ang nakakapagod na araw?
+    1002 [TG] Can I vent about an awkward meeting?
+    1003 [EN] Can I talk about a disappointing interview?
+    1004 [FIL] Puwede ba nating pag-usapan ang hindi pagkakaunawaan namin ng kaibigan ko?
+    1005 [TG] Can I vent about moving to a new city?
+    1006 [EN] Can I talk about a busy school week?
+    1007 [FIL] Puwede ba nating pag-usapan ang proyektong hindi pa tapos?
+    1008 [TG] Can I vent about a change of plans?
+    1009 [EN] Can I talk about a tough commute?
+    1010 [FIL] Puwede ba nating pag-usapan ang pangungulila ko sa bayan namin?
+
+  11.02 Help make a plan
+  Expected: Offer a short feasible plan and ask about any constraint that matters.
+    1011 [TG] Help mo akong mag-plan ng my first study session.
+    1012 [EN] Help me plan a weekend reset.
+    1013 [FIL] Tulungan mo akong magplano ng simpleng kaarawan.
+    1014 [TG] Help mo akong mag-plan ng tomorrow morning.
+    1015 [EN] Help me plan a room cleanup.
+    1016 [FIL] Tulungan mo akong magplano ng panonood ng pelikula kasama ang pamilya.
+    1017 [TG] Help mo akong mag-plan ng a week of simple meals.
+    1018 [EN] Help me plan a practice presentation.
+    1019 [FIL] Tulungan mo akong magplano ng malikhaing proyektong kalahating araw.
+    1020 [TG] Help mo akong mag-plan ng a trip to the library.
+
+  11.03 Brainstorm
+  Expected: Offer varied ideas and invite the user to pick one.
+    1021 [EN] Brainstorm ideas for a short story with me.
+    1022 [FIL] Mag-isip tayo ng mga ideya para sa maliit na hardin sa balkonahe.
+    1023 [TG] Brainstorm tayo for a class activity.
+    1024 [EN] Brainstorm ideas for a weekend hobby with me.
+    1025 [FIL] Mag-isip tayo ng mga ideya para sa murang regalo.
+    1026 [TG] Brainstorm tayo for a journal prompt.
+    1027 [EN] Brainstorm ideas for a desktop wallpaper with me.
+    1028 [FIL] Mag-isip tayo ng mga ideya para sa tema ng salu-salo.
+    1029 [TG] Brainstorm tayo for a practice coding project.
+    1030 [EN] Brainstorm ideas for a family game with me.
+
+  11.04 Explain briefly
+  Expected: Provide a concise plain-language explanation in the language requested.
+    1031 [FIL] Ipaliwanag ang dahilan ng pagbabago ng kulay ng langit sa dalawang pangungusap.
+    1032 [TG] Explain mo ang how rain forms in two sentences.
+    1033 [EN] Explain what a Rust enum is to me in two sentences.
+    1034 [FIL] Ipaliwanag ang dahilan ng pagbabago ng kulay ng mga dahon sa dalawang pangungusap.
+    1035 [TG] Explain mo ang what a database index does in two sentences.
+    1036 [EN] Explain how a clock stays accurate to me in two sentences.
+    1037 [FIL] Ipaliwanag ang kahulugan ng keyboard shortcut sa dalawang pangungusap.
+    1038 [TG] Explain mo ang what an audio codec does in two sentences.
+    1039 [EN] Explain how a rainbow forms to me in two sentences.
+    1040 [FIL] Ipaliwanag ang kahulugan ng checksum sa dalawang pangungusap.
+
+  11.05 Practice a conversation
+  Expected: Roleplay a short exchange, wait for the user's turn, and offer optional feedback.
+    1041 [TG] Practice tayo ng conversation about ordering coffee.
+    1042 [EN] Practice a conversation with me about asking directions.
+    1043 [FIL] Magsanay tayo sa pakikipag-usap tungkol sa pagpapakilala sa sarili.
+    1044 [TG] Practice tayo ng conversation about returning a purchase.
+    1045 [EN] Practice a conversation with me about asking for help.
+    1046 [FIL] Magsanay tayo sa pakikipag-usap tungkol sa pagpareserba ng mesa.
+    1047 [TG] Practice tayo ng conversation about joining a study group.
+    1048 [EN] Practice a conversation with me about making small talk.
+    1049 [FIL] Magsanay tayo sa pakikipag-usap tungkol sa pag-check in sa hotel.
+    1050 [TG] Practice tayo ng conversation about giving a project update.
+
+  11.06 Compare options
+  Expected: Ask for relevant preferences and compare concrete tradeoffs without taking action.
+    1051 [EN] Help me decide between studying now or after dinner.
+    1052 [FIL] Tulungan mo akong pumili sa pagitan ng pagsusulat ng tala sa papel at pagta-type.
+    1053 [TG] Help me choose between a morning walk or an evening walk.
+    1054 [EN] Help me decide between reading a book or watching a film.
+    1055 [FIL] Tulungan mo akong pumili sa pagitan ng pag-aayos ng file ayon sa paksa at ayon sa petsa.
+    1056 [TG] Help me choose between a short break or a longer lunch.
+    1057 [EN] Help me decide between writing an outline or freewriting.
+    1058 [FIL] Tulungan mo akong pumili sa pagitan ng pagtatrabaho sa bahay at sa aklatan.
+    1059 [TG] Help me choose between starting a solo project or a group project.
+    1060 [EN] Help me decide between a 25-minute timer or a 45-minute timer.
+
+  11.07 Reflect on an experience
+  Expected: Ask a follow-up about the topic and summarize the points the user shares.
+    1061 [FIL] Tulungan mo akong pagnilayan ang mga nagawa ko nang maayos ngayon.
+    1062 [TG] Tulungan mo akong mag-reflect on my first week in a new place.
+    1063 [EN] Help me reflect on a small win.
+    1064 [FIL] Tulungan mo akong pagnilayan ang natutuhan ko sa trabaho.
+    1065 [TG] Tulungan mo akong mag-reflect on a good conversation.
+    1066 [EN] Help me reflect on why I stopped writing.
+    1067 [FIL] Tulungan mo akong pagnilayan ang pinakabago kong malikhaing proyekto.
+    1068 [TG] Tulungan mo akong mag-reflect on my study habit.
+    1069 [EN] Help me reflect on a promise I kept.
+    1070 [FIL] Tulungan mo akong pagnilayan ang puna na natanggap ko.
+
+  11.08 Draft a message
+  Expected: Produce an editable draft for review with no external delivery.
+    1071 [TG] Draft mo ang short message about rescheduling a study session.
+    1072 [EN] Draft a short message about thanking a teammate.
+    1073 [FIL] Gumawa ng maikling draft tungkol sa paghingi ng tala mula sa pulong.
+    1074 [TG] Draft mo ang short message about inviting a friend to lunch.
+    1075 [EN] Draft a short message about checking on a classmate.
+    1076 [FIL] Gumawa ng maikling draft tungkol sa pagkumpirma sa panonood ng pelikula.
+    1077 [TG] Draft mo ang short message about asking for more details.
+    1078 [EN] Draft a short message about following up on a group project.
+    1079 [FIL] Gumawa ng maikling draft tungkol sa pagbabahagi ng playlist.
+    1080 [TG] Draft mo ang short message about introducing myself to the team.
+
+  11.09 Quiz me
+  Expected: Ask one question at a time and reveal the answer after the user's attempt.
+    1081 [EN] Quiz me on basic Rust syntax.
+    1082 [FIL] Tanungin mo ako tungkol sa bokabularyong Filipino bilang pagsasanay.
+    1083 [TG] I-quiz mo ako on multiplication tables.
+    1084 [EN] Quiz me on world capitals.
+    1085 [FIL] Tanungin mo ako tungkol sa mga bahagi ng pananalita bilang pagsasanay.
+    1086 [TG] I-quiz mo ako on the water cycle.
+    1087 [EN] Quiz me on keyboard shortcuts.
+    1088 [FIL] Tanungin mo ako tungkol sa pangalan ng mga nota bilang pagsasanay.
+    1089 [TG] I-quiz mo ako on basic geometry.
+    1090 [EN] Quiz me on logical fallacies.
+
+  11.10 Offer a short reflection prompt
+  Expected: Return one relevant journaling question and wait for the user.
+    1091 [FIL] Bigyan mo ako ng tanong sa journal tungkol sa pasasalamat.
+    1092 [TG] Give me a journal prompt about focus today.
+    1093 [EN] Give me a journal prompt about friendship.
+    1094 [FIL] Bigyan mo ako ng tanong sa journal tungkol sa pagpapahinga.
+    1095 [TG] Give me a journal prompt about creativity today.
+    1096 [EN] Give me a journal prompt about learning.
+    1097 [FIL] Bigyan mo ako ng tanong sa journal tungkol sa tiwala sa sarili.
+    1098 [TG] Give me a journal prompt about curiosity today.
+    1099 [EN] Give me a journal prompt about patience.
+    1100 [FIL] Bigyan mo ako ng tanong sa journal tungkol sa kabaitan.
+
+12 | Amica's local companion features
+
+  12.01 Start labeled timer
+  Expected: Start an actual local countdown with the supplied label.
+    1101 [TG] Set mo yung timer for 3 minutes named Tea.
+    1102 [EN] Set a timer for 5 minutes named Break.
+    1103 [FIL] Magtakda ng timer na 8 minutong may pangalang Stretch.
+    1104 [TG] Set mo yung timer for 10 minutes named Merienda.
+    1105 [EN] Set a timer for 12 minutes named Inbox.
+    1106 [FIL] Magtakda ng timer na 15 minutong may pangalang Reading.
+    1107 [TG] Set mo yung timer for 20 minutes named Practice.
+    1108 [EN] Set a timer for 25 minutes named Focus.
+    1109 [FIL] Magtakda ng timer na 30 minutong may pangalang Study.
+    1110 [TG] Set mo yung timer for 45 minutes named Writing.
+
+  12.02 Find saved note
+  Expected: Search local saved items and show exact title matches first.
+    1111 [EN] Find my note named Shopping.
+    1112 [FIL] Hanapin ang tala kong Study Ideas.
+    1113 [TG] Find mo yung note named Weekend.
+    1114 [EN] Find my note named Recipes.
+    1115 [FIL] Hanapin ang tala kong Library.
+    1116 [TG] Find mo yung note named Books.
+    1117 [EN] Find my note named Workshop.
+    1118 [FIL] Hanapin ang tala kong Room Setup.
+    1119 [TG] Find mo yung note named Amica Ideas.
+    1120 [EN] Find my note named Meeting Plan.
+
+  12.03 Save explicit note
+  Expected: Save the quoted payload privately to a local note using a derived title.
+    1121 [FIL] Itala ang “Bring a notebook”.
+    1122 [TG] Save mo sa notes ang “Water the basil”.
+    1123 [EN] Save a note saying “Outline the story”.
+    1124 [FIL] Itala ang “Call back on Friday”.
+    1125 [TG] Save mo sa notes ang “Borrow a pen”.
+    1126 [EN] Save a note saying “Review chapter two”.
+    1127 [FIL] Itala ang “Add the sketch to the draft”.
+    1128 [TG] Save mo sa notes ang “Practice after lunch”.
+    1129 [EN] Save a note saying “Read the manual”.
+    1130 [FIL] Itala ang “List three ideas”.
+
+  12.04 Add a task
+  Expected: Add the exact item to the current local task list.
+    1131 [TG] Add mo sa to-do list ko ang buy envelopes.
+    1132 [EN] Add water the plants to my to-do list.
+    1133 [FIL] Idagdag ang pag-aayos ng mga larawan sa listahan ng gagawin ko.
+    1134 [TG] Add mo sa to-do list ko ang outline the talk.
+    1135 [EN] Add clean the desk to my to-do list.
+    1136 [FIL] Idagdag ang pagbabasa ng ikalawang kabanata sa listahan ng gagawin ko.
+    1137 [TG] Add mo sa to-do list ko ang pick a movie.
+    1138 [EN] Add charge the headphones to my to-do list.
+    1139 [FIL] Idagdag ang pagtitingin sa kalendaryo sa listahan ng gagawin ko.
+    1140 [TG] Add mo sa to-do list ko ang review the checklist.
+
+  12.05 Reminder in 30 minutes
+  Expected: Schedule the quoted local notification for 30 minutes from now.
+    1141 [EN] Remind me in 30 minutes to take a break.
+    1142 [FIL] Paalalahanan ako pagkalipas ng 30 minuto na diligan ang mga halaman.
+    1143 [TG] Remind mo ako in 30 minutes to check the laundry.
+    1144 [EN] Remind me in 30 minutes to stretch.
+    1145 [FIL] Paalalahanan ako pagkalipas ng 30 minuto na magbasa ng isang pahina.
+    1146 [TG] Remind mo ako in 30 minutes to pack my bag.
+    1147 [EN] Remind me in 30 minutes to review the draft.
+    1148 [FIL] Paalalahanan ako pagkalipas ng 30 minuto na simulan ang balangkas.
+    1149 [TG] Remind mo ako in 30 minutes to check the oven timer.
+    1150 [EN] Remind me in 30 minutes to get the headphones.
+
+  12.06 Search conversation history
+  Expected: Show locally saved conversation matches and their dates.
+    1151 [FIL] Hanapin ang usapan natin tungkol sa pag-aaral ng Rust.
+    1152 [TG] Find mo yung chat natin about merienda ideas.
+    1153 [EN] Find our conversation about my study schedule.
+    1154 [FIL] Hanapin ang usapan natin tungkol sa pagpunta sa aklatan.
+    1155 [TG] Find mo yung chat natin about my writing plan.
+    1156 [EN] Find our conversation about keyboard shortcuts.
+    1157 [FIL] Hanapin ang usapan natin tungkol sa screensaver.
+    1158 [TG] Find mo yung chat natin about organizing photos.
+    1159 [EN] Find our conversation about the movie list.
+    1160 [FIL] Hanapin ang usapan natin tungkol sa ayos ng kuwarto.
+
+  12.07 Open Amica view
+  Expected: Navigate to the matching Amica view and focus its primary control.
+    1161 [TG] Open mo yung Conversation view sa Amica.
+    1162 [EN] Show me Amica's Calendar view.
+    1163 [FIL] Ipakita ang Saved ng Amica.
+    1164 [TG] Open mo yung Memory Map view sa Amica.
+    1165 [EN] Show me Amica's Apps view.
+    1166 [FIL] Ipakita ang Settings ng Amica.
+    1167 [TG] Open mo yung System Specs view sa Amica.
+    1168 [EN] Show me Amica's Timers view.
+    1169 [FIL] Ipakita ang mga bagong alaala ng Amica.
+    1170 [TG] Open mo yung Command Palette view sa Amica.
+
+  12.08 Set idle timeout
+  Expected: Set the idle entry delay locally and display the setting.
+    1171 [EN] Start the screensaver after 30 seconds of inactivity.
+    1172 [FIL] Simulan ang screensaver pagkatapos ng 1 minuto na walang galaw.
+    1173 [TG] Set mo ang screensaver to start after 2 minutes idle.
+    1174 [EN] Start the screensaver after 3 minutes of inactivity.
+    1175 [FIL] Simulan ang screensaver pagkatapos ng 5 minuto na walang galaw.
+    1176 [TG] Set mo ang screensaver to start after 10 minutes idle.
+    1177 [EN] Start the screensaver after 15 minutes of inactivity.
+    1178 [FIL] Simulan ang screensaver pagkatapos ng 20 minuto na walang galaw.
+    1179 [TG] Set mo ang screensaver to start after 30 minutes idle.
+    1180 [EN] Start the screensaver after 60 minutes of inactivity.
+
+  12.09 Choose ambient palette
+  Expected: Apply and preview the specified original Slint palette for Ambient mode.
+    1181 [FIL] Gamitin ang kulay na Indigo para sa Ambient.
+    1182 [TG] Set Ambient to the Lavender palette.
+    1183 [EN] Use the Midnight color palette for Ambient.
+    1184 [FIL] Gamitin ang kulay na Dawn para sa Ambient.
+    1185 [TG] Set Ambient to the Dusk palette.
+    1186 [EN] Use the Ocean color palette for Ambient.
+    1187 [FIL] Gamitin ang kulay na Sampaguita para sa Ambient.
+    1188 [TG] Set Ambient to the Forest palette.
+    1189 [EN] Use the Ember color palette for Ambient.
+    1190 [FIL] Gamitin ang kulay na Monochrome para sa Ambient.
+
+  12.10 Adjust dashboard widget
+  Expected: Apply the specified fullscreen dashboard setting from the local catalog.
+    1191 [TG] Paki-show the clock sa Dashboard screensaver.
+    1192 [EN] For the Dashboard screensaver, please hide the clock.
+    1193 [FIL] Ipakita ang petsa sa Dashboard screensaver.
+    1194 [TG] Paki-hide the date sa Dashboard screensaver.
+    1195 [EN] For the Dashboard screensaver, please show the orb.
+    1196 [FIL] Itago ang orb sa Dashboard screensaver.
+    1197 [TG] Paki-show the next timer sa Dashboard screensaver.
+    1198 [EN] For the Dashboard screensaver, please hide the next timer.
+    1199 [FIL] Ipakita ang status ng media sa Dashboard screensaver.
+    1200 [TG] Paki-hide the media status sa Dashboard screensaver.
+

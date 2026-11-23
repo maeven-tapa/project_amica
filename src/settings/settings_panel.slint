@@ -1,0 +1,225 @@
+import { Button, CheckBox, ComboBox, ScrollView } from "std-widgets.slint";
+
+component AudioPicker inherits VerticalLayout {
+    in property <string> label;
+    in property <string> current;
+    in property <[string]> options;
+    in property <int> index;
+    callback select(string);
+
+    spacing: 5px;
+
+    Text {
+        text: root.label;
+        color: #173944;
+        font-size: 14px;
+        font-weight: 650;
+    }
+
+    ComboBox {
+        model: root.options;
+        current-index: root.index;
+        selected(value) => { root.select(value); }
+    }
+
+    Text {
+        text: root.current;
+        color: #4f6974;
+        font-size: 12px;
+        overflow: elide;
+    }
+}
+
+export component SettingsPanel inherits Rectangle {
+    in property <[string]> microphone-options;
+    in property <[string]> speaker-options;
+    in property <int> microphone-selection;
+    in property <int> speaker-selection;
+    in property <string> current-microphone;
+    in property <string> current-speaker;
+    in property <bool> search-enabled;
+    in property <string> reply-language;
+    in property <string> reply-length;
+    in property <bool> show-captions;
+    in property <bool> reduced-motion;
+    in property <bool> memory-capture;
+    in property <string> memory-error;
+    in property <string> saver-preset;
+    in property <string> saver-palette;
+    in property <string> saver-idle;
+    in property <bool> saver-dim;
+    property <bool> confirm-clear;
+    in property <string> error;
+    callback refresh;
+    callback select-device(bool, string);
+    callback set-search(bool);
+    callback conversation-setting(string, string);
+    callback configure-memory(bool, bool);
+    callback saver-setting(string, string);
+    callback preview-saver;
+
+    background: #f7fbfb;
+    border-width: 1px;
+    border-color: #dfebed;
+    border-radius: 22px;
+
+    Text {
+        x: 20px;
+        y: 15px;
+        text: "Settings";
+        font-size: 21px;
+        font-weight: 650;
+        color: #142e3a;
+    }
+
+    Button {
+        x: parent.width - self.width - 16px;
+        y: 13px;
+        text: "Refresh devices";
+        clicked => { root.refresh(); }
+    }
+
+    scroll := ScrollView {
+        x: 16px;
+        y: 56px;
+        width: parent.width - 32px;
+        height: parent.height - self.y - 14px;
+        horizontal-scrollbar-policy: always-off;
+        content-width: self.visible-width;
+        content-height: max(body.height, self.visible-height);
+
+        body := VerticalLayout {
+            x: 4px;
+            y: 0px;
+            width: scroll.visible-width - 14px;
+            height: self.preferred-height;
+            spacing: 16px;
+
+            AudioPicker {
+                label: "Microphone";
+                options: root.microphone-options;
+                current: root.current-microphone;
+                index: root.microphone-selection;
+                select(value) => { root.select-device(true, value); }
+            }
+
+            AudioPicker {
+                label: "Speaker";
+                options: root.speaker-options;
+                current: root.current-speaker;
+                index: root.speaker-selection;
+                select(value) => { root.select-device(false, value); }
+            }
+
+            VerticalLayout {
+                spacing: 6px;
+                Text { text: "Conversation"; font-weight: 650; color: #173944; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    ComboBox {
+                        model: ["Auto", "Filipino", "English", "Taglish"];
+                        current-value: root.reply-language;
+                        accessible-label: "Reply language";
+                        selected(value) => { root.conversation-setting("reply_language", value); }
+                    }
+                    ComboBox {
+                        model: ["Short", "Normal", "Detailed"];
+                        current-value: root.reply-length;
+                        accessible-label: "Reply length";
+                        selected(value) => { root.conversation-setting("reply_length", value); }
+                    }
+                }
+                CheckBox {
+                    text: "Voice captions";
+                    checked: root.show-captions;
+                    toggled => { root.conversation-setting("captions", self.checked ? "on" : "off"); }
+                }
+                CheckBox {
+                    text: "Reduce motion";
+                    checked: root.reduced-motion;
+                    toggled => { root.conversation-setting("reduced_motion", self.checked ? "on" : "off"); }
+                }
+            }
+
+            VerticalLayout {
+                spacing: 6px;
+                Text { text: "Learned memory"; font-weight: 650; color: #173944; }
+                CheckBox {
+                    text: "Learn from conversations";
+                    checked: root.memory-capture;
+                    toggled => { root.configure-memory(self.checked, false); }
+                }
+                Text {
+                    text: "Amica learns preferences and goals from completed chats. Pause capture here or use Private in Conversation.";
+                    color: #4f6974;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+                Button {
+                    text: root.confirm-clear ? "Confirm clear learned memories" : "Clear learned memories";
+                    clicked => {
+                        if root.confirm-clear { root.configure-memory(root.memory-capture, true); }
+                        root.confirm-clear = !root.confirm-clear;
+                    }
+                }
+                if root.confirm-clear: Button { text: "Cancel"; clicked => { root.confirm-clear = false; } }
+                if root.memory-error != "": Text { text: root.memory-error; wrap: word-wrap; color: #983d49; }
+            }
+
+            VerticalLayout {
+                spacing: 4px;
+                Text { text: "Screensaver"; font-weight: 650; color: #173944; }
+                HorizontalLayout {
+                    spacing: 6px;
+                    ComboBox {
+                        model: ["Dashboard", "Black Clock", "Ambient"];
+                        current-value: root.saver-preset;
+                        accessible-label: "Screensaver preset";
+                        selected(value) => { root.saver-setting("saver_preset", value); }
+                    }
+                    Button { text: "Preview"; clicked => { root.preview-saver(); } }
+                }
+                ComboBox {
+                    model: ["Off", "30 seconds", "1 minute", "2 minutes", "3 minutes", "5 minutes", "10 minutes", "15 minutes", "20 minutes", "30 minutes", "60 minutes"];
+                    current-value: root.saver-idle;
+                    accessible-label: "Inactivity before screensaver";
+                    selected(value) => {
+                        root.saver-setting("saver_idle", value == "30 seconds" ? "30" : value == "1 minute" ? "60" : value == "2 minutes" ? "120" :
+                            value == "3 minutes" ? "180" : value == "5 minutes" ? "300" : value == "10 minutes" ? "600" :
+                            value == "15 minutes" ? "900" : value == "20 minutes" ? "1200" : value == "30 minutes" ? "1800" :
+                            value == "60 minutes" ? "3600" : "0");
+                    }
+                }
+                ComboBox {
+                    model: ["Indigo", "Lavender", "Midnight", "Dawn", "Dusk", "Ocean", "Sampaguita", "Forest", "Ember", "Monochrome"];
+                    current-value: root.saver-palette;
+                    accessible-label: "Screensaver color palette";
+                    selected(value) => { root.saver-setting("saver_palette", value); }
+                }
+                CheckBox { text: "Dim on battery"; checked: root.saver-dim; toggled => { root.saver-setting("saver_dim", self.checked ? "on" : "off"); } }
+            }
+
+            VerticalLayout {
+                spacing: 4px;
+                CheckBox {
+                    text: "Google Search";
+                    checked: root.search-enabled;
+                    toggled => { root.set-search(self.checked); }
+                }
+                Text {
+                    text: "Use live search for questions that need current information.";
+                    color: #4f6974;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+            }
+
+            if root.error != "": Text {
+                text: root.error;
+                color: #983d49;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

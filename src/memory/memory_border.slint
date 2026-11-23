@@ -1,0 +1,34 @@
+component BorderPath inherits Path {
+    viewbox-width: self.width / 1px;
+    viewbox-height: self.height / 1px;
+}
+
+export component MemoryBorder inherits Rectangle {
+    in property <string> ripple;
+    in property <float> pulse;
+    in property <bool> saver-look;
+
+    x: 0px;
+    y: 0px;
+    width: 100%;
+    height: 100%;
+    border-width: root.saver-look ? 0px : 1px;
+    border-color: #a9c2ce;
+    accessible-role: none;
+
+    if root.ripple != "" && root.pulse > 0: BorderPath {
+        commands: root.ripple;
+        stroke-width: 8px;
+        opacity: root.pulse * 0.65;
+        stroke: root.saver-look ? @linear-gradient(135deg, #a88cff55, #69b9f45e 40%, #78dfd075 72%, #9c88ee4f)
+            : @linear-gradient(135deg, #9073d84d 6%, #6288cf50 37%, #39b3a952 67%, #7283cb42);
+    }
+
+    if root.ripple != "" && root.pulse > 0: BorderPath {
+        commands: root.ripple;
+        stroke-width: root.saver-look ? 1.5px : 1.25px;
+        opacity: root.pulse;
+        stroke: root.saver-look ? @linear-gradient(135deg, #c1aeffbc, #8ed4ffc4 38%, #95efe4c9 68%, #9aabf9af)
+            : @linear-gradient(135deg, #765cb37a 4%, #729ec290 38%, #459e9d94 66%, #707cbd7a 99%);
+    }
+}

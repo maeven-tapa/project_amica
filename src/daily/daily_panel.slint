@@ -1,0 +1,52 @@
+import { Button, CheckBox, LineEdit, ListView } from "std-widgets.slint";
+
+export struct DailyRow { id: string, label: string, due: string, completed: bool, reminder: bool }
+
+export component DailyPanel inherits Rectangle {
+    in property <[DailyRow]> items;
+    in property <string> notified;
+    callback add-task(string);
+    callback add-reminder(string);
+    callback finish(string, bool);
+
+    border-radius: 22px;
+    background: #f7fbfb;
+    border-color: #dfebed;
+    border-width: 1px;
+
+    VerticalLayout {
+        padding: 18px;
+        spacing: 9px;
+        Text { text: "Tasks & reminders"; color: #173944; font-size: 21px; font-weight: 650; }
+        if root.notified != "": Text { text: "Due · " + root.notified; color: #674694; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 7px;
+            entry := LineEdit { placeholder-text: "Task or reminder"; accessible-label: "Task or reminder"; }
+            Button {
+                text: "Add task";
+                enabled: entry.text != "";
+                clicked => { root.add-task(entry.text); entry.text = ""; }
+            }
+        }
+        HorizontalLayout {
+            spacing: 7px;
+            Button {
+                text: "Remind in 30 min";
+                enabled: entry.text != "";
+                clicked => { root.add-reminder(entry.text); entry.text = ""; }
+            }
+        }
+        ListView {
+            vertical-stretch: 1;
+            for item in root.items: VerticalLayout {
+                padding-bottom: 9px;
+                CheckBox {
+                    text: item.label;
+                    checked: item.completed;
+                    toggled => { root.finish(item.id, self.checked); }
+                }
+                if item.reminder: Text { text: item.due; color: #536b74; font-size: 12px; }
+            }
+        }
+    }
+}

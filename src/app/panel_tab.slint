@@ -1,0 +1,89 @@
+export component PanelTab inherits FocusScope {
+    in property <string> label;
+    in property <bool> selected;
+    in property <bool> pinned;
+    in property <bool> closable: true;
+    in property <bool> keep-close-visible;
+    callback select;
+    callback close;
+
+    property <bool> hovered: mouse.has-hover || close-mouse.has-hover;
+    property <length> label-width: label-text.preferred-width + 22px;
+    property <bool> show-close: root.closable && (root.hovered || root.keep-close-visible);
+
+    width: root.label-width + (root.show-close ? 26px : 0px);
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.select(); }
+
+    key-released(event) => {
+        if (event.text == Key.Return || event.text == Key.Space) {
+            root.select();
+            return accept;
+        }
+        if (event.text == Key.Delete && root.closable) {
+            root.close();
+            return accept;
+        }
+        return reject;
+    }
+
+    Rectangle {
+        border-radius: 9px;
+        border-width: root.has-focus || root.pinned ? 1px : 0px;
+        border-color: root.has-focus ? #3a858b : #def0ee;
+        background: root.selected ? #e5f3f0 : root.hovered || root.pinned ? #f0f7f6 : transparent;
+
+        label-text := Text {
+            x: 0px;
+            width: root.label-width;
+            text: root.label;
+            color: root.selected ? #163f47 : #536b74;
+            font-size: 13px;
+            font-weight: root.selected ? 650 : 500;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+
+    mouse := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.focus(); root.select(); }
+    }
+
+    Rectangle {
+        x: root.label-width;
+        y: (parent.height - self.height) / 2;
+        width: 23px;
+        height: 23px;
+        visible: root.show-close;
+        border-radius: 6px;
+        background: close-mouse.has-hover ? #cfe7e2 : transparent;
+
+        Path {
+            x: 6px;
+            y: 6px;
+            width: 11px;
+            height: 11px;
+            viewbox-width: 12;
+            viewbox-height: 12;
+            stroke: #315b62;
+            stroke-width: 1.5px;
+            commands: "M 2.8 2.8 L 9.2 9.2 M 9.2 2.8 L 2.8 9.2";
+        }
+    }
+
+    close-mouse := TouchArea {
+        x: root.label-width;
+        y: (parent.height - self.height) / 2;
+        width: 23px;
+        height: 23px;
+        visible: root.show-close;
+        mouse-cursor: pointer;
+        accessible-role: button;
+        accessible-label: "Close " + root.label;
+        accessible-action-default => { root.close(); }
+        clicked => { root.close(); }
+    }
+}

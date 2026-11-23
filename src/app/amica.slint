@@ -1,0 +1,753 @@
+import { AudioState, MicFooter } from "../microphone/microphone.slint";
+import { OrbPanel } from "../orb/orb_panel.slint";
+import { ChatPanel, ChatMessage, ConversationRow } from "../chat/chat_panel.slint";
+import { VoiceState } from "../voice/voice.slint";
+import { TimeDatePanel, CalendarDay } from "../local_time/time_date_panel.slint";
+import { TimerRow } from "../timers/timer_list.slint";
+import { MemoryMaps, GraphFrame, GraphNode, GraphPoint, MemoryGraph } from "../memory/memory_maps.slint";
+import { SavedPanel, SavedRow } from "../memory/saved_panel.slint";
+import { LearnedRow, LearnedSource } from "../memory/recent_memories.slint";
+import { MemoryHoldArea } from "../memory/hold_area.slint";
+import { AppsPanel } from "../desktop/apps_panel.slint";
+import { MediaPanel } from "../media/media_panel.slint";
+import { SettingsPanel } from "../settings/settings_panel.slint";
+import { HardwarePanel, HardwareRow } from "../hardware/hardware_panel.slint";
+import { PanelTab } from "panel_tab.slint";
+import { Button, ScrollView } from "std-widgets.slint";
+import { Screensaver } from "../screensaver/screensaver.slint";
+import { CommandPalette, PaletteRow } from "../actions/command_palette.slint";
+import { DailyPanel, DailyRow } from "../daily/daily_panel.slint";
+import { RoutinePanel, RoutineRow } from "../routines/routine_panel.slint";
+import { GridOverlay, PointerMarker } from "../desktop/grid.slint";
+export { AudioState, ChatMessage, ConversationRow, VoiceState, TimerRow, SavedRow, CalendarDay, GraphFrame, GraphNode, GraphPoint, MemoryGraph, LearnedRow, LearnedSource, PaletteRow, DailyRow, GridOverlay, PointerMarker, RoutineRow }
+export enum Panel { none, conversation, time-date, saved, memory-map, apps, youtube, spotify, settings, system-specs, command-palette, daily, routines }
+export struct PanelItem { panel: Panel, label: string }
+
+export component AmicaWindow inherits Window {
+    title: "Amica";
+    icon: @image-url("../brand/amica.svg");
+    preferred-width: 1152px;
+    preferred-height: 760px;
+    min-width: 510px;
+    min-height: 600px;
+    background: #ffffff;
+    always-on-top: root.saver-active;
+    default-font-family: "Segoe UI";
+    in property <image> orb;
+    out property <bool> orb-hovered: orb-panel.hovered && !root.memory-open;
+    out property <float> orb-pointer-x: orb-panel.pointer-x;
+    out property <float> orb-pointer-y: orb-panel.pointer-y;
+    in property <AudioState> audio-state: AudioState.muted;
+    in property <string> device-name;
+    in property <string> audio-message;
+    in property <float> input-level;
+    callback toggle-microphone;
+    in property <[ChatMessage]> chat-messages;
+    in-out property <string> chat-draft;
+    in property <string> chat-error;
+    in property <string> gemini-model;
+    in property <bool> chat-ready;
+    in property <bool> thinking;
+    in property <string> conversation-id: "1";
+    in property <string> conversation-title: "Conversation";
+    in property <[ConversationRow]> conversation-rows;
+    in property <bool> private-chat;
+    in property <string> chat-source;
+    in property <string> reply-language: "Auto";
+    in property <string> reply-length: "Normal";
+    in property <string> reply-style: "Auto";
+    in property <bool> show-captions: true;
+    in property <bool> reduced-motion;
+    callback manage-conversation(string, string);
+    callback search-conversations(string);
+    callback reload-conversation;
+    callback conversation-setting(string, string);
+    callback send-chat;
+    in property <VoiceState> voice-state;
+    in property <string> voice-model;
+    in property <string> voice-error;
+    in property <string> voice-caption;
+    in property <string> voice-recovery;
+    in property <float> speech-level;
+    out property <bool> voice-active: voice-state != VoiceState.idle && voice-state != VoiceState.failed;
+    callback sync-voice;
+    callback save-voice-turn(string, string, string, string);
+    in property <string> local-clock;
+    in property <string> local-date;
+    in property <string> saver-clock;
+    in property <string> saver-period;
+    in property <string> saver-date;
+    in property <string> home-media: "No active media";
+    in property <bool> media-fullscreen;
+    in property <bool> saver-active;
+    in property <string> active-saver-preset: "Dashboard";
+    in property <bool> saver-dimmed;
+    in property <bool> saver-dim-on-battery;
+    in property <int> saver-idle-seconds;
+    in property <string> saver-idle-label: "Off";
+    in property <string> saver-preset: "Dashboard";
+    in property <string> saver-palette: "Indigo";
+    in property <color> saver-tint: #392b6c;
+    in property <float> saver-drift;
+    in property <string> saver-ripple;
+    in property <float> saver-edge-glow;
+    out property <bool> saver-show-ripple: saver.show-ripple;
+    out property <length> saver-ripple-width: saver.ripple-width;
+    out property <length> saver-ripple-height: saver.ripple-height;
+    in property <bool> saver-show-clock: true;
+    in property <bool> saver-show-date: true;
+    in property <bool> saver-show-orb: true;
+    in property <bool> saver-show-timer: true;
+    in property <bool> saver-show-media: true;
+    callback enter-saver(string);
+    callback exit-saver;
+    callback save-saver-setting(string, string);
+    in property <string> power-request;
+    in property <string> power-request-id;
+    callback power-decision(bool);
+    callback stop-desktop;
+    callback run-local-command(string);
+    callback search-palette(string);
+    in property <[PaletteRow]> palette-rows;
+    in property <bool> desktop-control;
+    in property <string> desktop-target;
+    in property <string> command-result;
+    in property <[DailyRow]> daily-rows;
+    in property <string> due-notice;
+    callback add-daily(string, bool);
+    callback finish-daily(string, bool);
+    in property <[RoutineRow]> routine-rows;
+    in-out property <string> routine-name;
+    in-out property <string> routine-script;
+    in property <string> routine-result;
+    in property <string> routine-run-id;
+    in property <bool> routine-running;
+    callback refresh-routines;
+    callback routine-edit(string, string, string);
+    callback stop-routine;
+    callback routine-shortcut(string);
+    in property <string> calendar-month;
+    in property <[CalendarDay]> calendar-days;
+    callback change-month(int);
+    in property <[TimerRow]> timer-rows;
+    in property <[SavedRow]> saved-rows;
+    in property <MemoryGraph> memory-graph;
+    in property <[LearnedRow]> learned-rows;
+    in property <[LearnedRow]> learned-graph-rows;
+    in property <LearnedRow> learned-detail;
+    in property <bool> memory-capture: true;
+    in property <bool> memory-intro;
+    in property <string> memory-error;
+    callback refresh-memories;
+    callback search-memories(string);
+    callback select-memory(string);
+    callback change-memory(string, string, string);
+    callback open-memory-source(string);
+    callback configure-memory(bool, bool);
+    callback dismiss-memory-intro;
+    in property <GraphFrame> memory-frame;
+    in-out property <float> memory-yaw <=> memory.yaw;
+    out property <float> memory-pitch: memory.pitch;
+    out property <bool> memory-spinning: memory.spinning;
+    in property <string> memory-ripple;
+    in property <float> memory-pulse;
+    out property <bool> memory-open;
+    out property <length> memory-width: memory.width;
+    out property <length> memory-height: memory.height;
+    in-out property <bool> memory-charging;
+    in-out property <bool> memory-flash;
+    callback hold-memory(bool, bool);
+    callback activate-memory(bool);
+    callback memory-visibility-changed(bool);
+    callback toggle-fullscreen;
+    callback exit-amica;
+    in property <string> app-launch-error;
+    in property <bool> app-launch-pending;
+    callback launch-app(string);
+    in property <string> desktop-error;
+    in property <string> media-error;
+    in property <bool> media-audio-available;
+    in property <bool> media-playing;
+    in property <bool> media-muted;
+    in property <string> media-player-action;
+    in property <bool> youtube-open;
+    in property <bool> spotify-open;
+    out property <length> media-x: content.x + media-card.x + media-card.content-x;
+    out property <length> media-y: content.y + media-card.y + media-card.content-y;
+    out property <length> media-width: media-card.content-width;
+    out property <length> media-height: media-card.content-height;
+    callback reload-media;
+    callback open-media-external;
+    callback toggle-media-mute;
+    callback switch-media-player;
+    callback play-media(string, string);
+    in property <string> input-device-id;
+    in property <string> output-device-id;
+    in property <[string]> microphone-options;
+    in property <[string]> speaker-options;
+    in property <int> microphone-selection;
+    in property <int> speaker-selection;
+    in property <string> current-microphone;
+    in property <string> current-speaker;
+    in property <bool> google-search-enabled;
+    in property <string> settings-error;
+    callback refresh-settings;
+    in property <[HardwareRow]> hardware-rows;
+    in property <bool> hardware-scanning;
+    in property <string> hardware-error;
+    callback scan-hardware;
+    callback select-audio-device(bool, string);
+    callback apply-audio-device(bool);
+    callback enable-google-search(bool);
+    in property <string> finished-timer;
+    in property <string> local-error;
+    callback cancel-timer(string);
+    in property <[PanelItem]> panel-tabs;
+    in property <Panel> active-panel;
+    callback show-panel(Panel);
+    callback close-panel(Panel);
+
+    property <length> gutter: self.width < 950px ? 22px : 34px;
+    property <color> ink: #142e3a;
+    property <color> rule: #e8eef0;
+    property <bool> memory-opened-from-orb;
+    property <bool> media-active: root.active-panel == Panel.youtube || root.active-panel == Panel.spotify;
+    property <bool> chrome-visible: !root.saver-active && root.power-request == "";
+    property <string> next-timer: root.timer-rows.length > 0 ? root.timer-rows[0].countdown : "";
+    public function focus-saver() { saver.focus(); }
+    public function focus-home() { shortcuts.focus(); }
+    public function focus-palette() { palette.focus-input(); }
+    public function focus-conversation() { chat.focus-message(); }
+    public function focus-recent-memories() { memory.open-recent(); }
+    public function show-chat-search(query: string) { chat.open-search(query); }
+
+    public function present-memory(from-orb: bool) {
+        if (root.memory-open) { return; }
+        root.memory-charging = false;
+        root.memory-flash = false;
+        root.memory-opened-from-orb = from-orb;
+        root.memory-open = true;
+        memory.focus-back();
+        root.memory-visibility-changed(true);
+    }
+
+    public function dismiss-memory() {
+        root.memory-charging = false;
+        root.memory-flash = false;
+        if (!root.memory-open) { return; }
+        root.memory-open = false;
+        root.memory-visibility-changed(false);
+        if (root.memory-opened-from-orb) {
+            orb-panel.focus-link();
+        } else {
+            brand.focus();
+        }
+    }
+
+    function reveal-tab(left: length, right: length) {
+        if (left + tab-strip.content-x < 0px) {
+            tab-strip.content-x = -left;
+        } else if (right + tab-strip.content-x > tab-strip.visible-width) {
+            tab-strip.content-x = tab-strip.visible-width - right;
+        }
+    }
+
+    forward-focus: shortcuts;
+    init => { shortcuts.focus(); }
+
+    shortcuts := FocusScope {
+        width: parent.width;
+        height: parent.height;
+
+        key-released(event) => {
+            if (event.text == Key.Escape && root.power-request != "") {
+                root.power-decision(false);
+                return accept;
+            }
+            if (event.text == Key.F1 && root.chrome-visible) {
+                root.toggle-fullscreen();
+                return accept;
+            }
+            if (event.text == Key.Escape && root.desktop-control && root.chrome-visible) {
+                root.stop-desktop();
+                return accept;
+            }
+            if (root.chrome-visible && (event.text == Key.F2 || event.text == Key.F3 || event.text == Key.F4 || event.text == Key.F5 ||
+                event.text == Key.F6 || event.text == Key.F7 || event.text == Key.F8)) {
+                root.routine-shortcut(event.text == Key.F2 ? "F2" : event.text == Key.F3 ? "F3" : event.text == Key.F4 ? "F4" :
+                    event.text == Key.F5 ? "F5" : event.text == Key.F6 ? "F6" : event.text == Key.F7 ? "F7" : "F8");
+                return accept;
+            }
+            return reject;
+        }
+
+        header := Rectangle {
+            y: 0px;
+            width: parent.width;
+            height: 74px;
+            visible: root.chrome-visible && !root.memory-open;
+            accessible-role: banner;
+
+            brand := FocusScope {
+                x: root.gutter - 8px;
+                y: (parent.height - self.height) / 2;
+                width: brand-label.x + brand-label.preferred-width + 9px;
+                height: 48px;
+                accessible-role: button;
+                accessible-label: "Amica Memory Maps";
+                accessible-action-default => { root.activate-memory(false); }
+
+                key-released(event) => {
+                    if (event.text == Key.Return || event.text == Key.Space) {
+                        root.activate-memory(false);
+                        return accept;
+                    }
+                    return reject;
+                }
+
+                Rectangle {
+                    border-radius: 13px;
+                    background: brand-pointer.has-hover ? #f0f8f7 : transparent;
+                    border-width: brand.has-focus ? 1px : 0px;
+                    border-color: #69aaa9;
+                    animate background { duration: 150ms; }
+                }
+
+                Image {
+                    x: 8px;
+                    y: (parent.height - self.height) / 2;
+                    width: 36px;
+                    height: self.width;
+                    source: @image-url("../brand/amica.svg");
+                    accessible-role: none;
+                }
+
+                brand-label := Text {
+                    x: 56px;
+                    width: self.preferred-width;
+                    height: parent.height;
+                    text: "Amica";
+                    font-size: 23px;
+                    font-weight: 650;
+                    color: root.ink;
+                    vertical-alignment: center;
+                    accessible-role: none;
+                }
+
+                brand-pointer := MemoryHoldArea {
+                    mouse-cursor: pointer;
+                    hold-changed(holding) => { root.hold-memory(holding, false); }
+                }
+            }
+
+            tab-strip := ScrollView {
+                x: brand.x + brand.width + 14px;
+                y: 18px;
+                width: max(0px, status.x - self.x - 14px);
+                height: 50px;
+                content-width: max(self.visible-width, tabs.width);
+                content-height: self.visible-height;
+                vertical-scrollbar-policy: always-off;
+
+                tabs := HorizontalLayout {
+                    x: max(0px, (tab-strip.visible-width - self.width) / 2);
+                    y: 1px;
+                    width: self.preferred-width;
+                    height: 35px;
+                    spacing: 4px;
+
+                    PanelTab {
+                        label: "Home";
+                        pinned: true;
+                        selected: root.active-panel == Panel.none;
+                        select => { root.show-panel(Panel.none); }
+                    }
+
+                    PanelTab {
+                        label: "Apps";
+                        pinned: true;
+                        selected: root.active-panel == Panel.apps;
+                        closable: self.selected;
+                        changed selected => {
+                            if (self.selected) { root.reveal-tab(tabs.x + self.x, tabs.x + self.x + self.width); }
+                        }
+                        select => { root.show-panel(Panel.apps); }
+                        close => { root.close-panel(Panel.apps); }
+                    }
+
+                    Button {
+                        text: "Screensaver";
+                        clicked => { root.enter-saver(""); }
+                    }
+
+                    for entry in root.panel-tabs: PanelTab {
+                        label: entry.label;
+                        selected: root.active-panel == entry.panel;
+                        keep-close-visible: entry.panel == Panel.youtube || entry.panel == Panel.spotify;
+                        changed selected => {
+                            if (self.selected) { root.reveal-tab(tabs.x + self.x, tabs.x + self.x + self.width); }
+                        }
+                        select => { root.show-panel(entry.panel); }
+                        close => { root.close-panel(entry.panel); }
+                    }
+                }
+            }
+
+            status := Rectangle {
+                width: status-label.x + status-label.preferred-width + 12px;
+                height: 32px;
+                x: parent.width - root.gutter - self.width;
+                y: (parent.height - self.height) / 2;
+                border-radius: 16px;
+                border-width: 1px;
+                border-color: root.voice-active ? #e8ddf4 : #e0eceb;
+                background: root.voice-active ? #f7f2fc : #f6faf9;
+
+                Path {
+                    x: 12px;
+                    y: 8px;
+                    width: 16px;
+                    height: 16px;
+                    viewbox-width: 16;
+                    viewbox-height: 16;
+                    stroke: #3b7778;
+                    stroke-width: 1.1px;
+                    commands: "M 8 1.7 L 13.2 3.6 V 7.4 C 13.2 10.5 11 12.8 8 14 C 5 12.8 2.8 10.5 2.8 7.4 V 3.6 Z M 5.7 7.7 L 7.4 9.4 L 10.4 6.3";
+                }
+                status-label := Text {
+                    x: 34px;
+                    width: self.preferred-width;
+                    height: parent.height;
+                    text: root.private-chat ? "Private session" : root.audio-state == AudioState.listening ? root.voice-model : "Microphone off";
+                    font-size: 12px;
+                    font-weight: 550;
+                    color: #335d61;
+                    vertical-alignment: center;
+                }
+            }
+
+            if root.desktop-control: Button {
+                x: status.x - self.width - 6px;
+                y: 8px;
+                height: 24px;
+                text: "Stop desktop control";
+                clicked => { root.stop-desktop(); }
+            }
+
+            Rectangle { y: parent.height - 1px; width: parent.width; height: 1px; background: root.rule; }
+        }
+
+        content := Rectangle {
+            x: root.gutter;
+            y: header.height + 18px;
+            width: parent.width - 2 * root.gutter;
+            height: footer.y - self.y - 20px;
+            visible: root.chrome-visible && !root.memory-open;
+            accessible-role: main;
+
+            orb-panel := OrbPanel {
+                x: 0px;
+                y: 0px;
+                width: root.active-panel == Panel.none ? parent.width : max(0px, chat.x - 18px);
+                height: parent.height;
+                visible: root.active-panel == Panel.none || (!root.media-active && chat.x >= 250px);
+                orb: root.orb;
+                audio-state: root.audio-state;
+                audio-message: root.audio-message;
+                chat-thinking: root.thinking;
+                voice-state: root.voice-state;
+                voice-error: root.voice-error;
+                can-type: root.audio-state != AudioState.listening && root.active-panel != Panel.conversation;
+                memory-charging: root.memory-charging;
+                memory-flash: root.memory-flash;
+                toggle-microphone => { root.toggle-microphone(); }
+                open-chat => { root.show-panel(Panel.conversation); chat.focus-message(); }
+                open-memory => { root.activate-memory(true); }
+                hold-memory(holding) => { root.hold-memory(holding, true); }
+            }
+
+            chat := ChatPanel {
+                x: parent.width - self.width;
+                y: 0px;
+                width: parent.width < 700px ? parent.width : min(540px, max(370px, parent.width * 0.445));
+                height: parent.height;
+                visible: root.active-panel == Panel.conversation;
+                messages: root.chat-messages;
+                draft <=> root.chat-draft;
+                error: root.chat-error;
+                model: root.voice-active ? root.voice-model + " · Aoede" : root.gemini-model;
+                ready: root.chat-ready;
+                thinking: root.thinking;
+                voice-active: root.voice-active;
+                voice-caption: root.show-captions ? root.voice-caption : "";
+                voice-recovery: root.voice-recovery;
+                voice-error: root.voice-error;
+                title: root.conversation-title;
+                source: root.chat-source;
+                conversations: root.conversation-rows;
+                private-chat: root.private-chat;
+                memory-intro: root.memory-intro;
+                reply-style: root.reply-style;
+                set-style(value) => { root.conversation-setting("reply_style", value); }
+                dismiss-intro => { root.dismiss-memory-intro(); }
+                manage(action, value) => { root.manage-conversation(action, value); }
+                search(value) => { root.search-conversations(value); }
+                talk => { root.toggle-microphone(); }
+                send => { root.send-chat(); }
+            }
+
+            TimeDatePanel {
+                x: chat.x;
+                y: 0px;
+                width: chat.width;
+                height: parent.height;
+                visible: root.active-panel == Panel.time-date;
+                month: root.calendar-month;
+                days: root.calendar-days;
+                change-month(offset) => { root.change-month(offset); }
+                clock: root.local-clock;
+                date: root.local-date;
+                timers: root.timer-rows;
+                finished: root.finished-timer;
+                error: root.local-error;
+                cancel-timer(id) => { root.cancel-timer(id); }
+            }
+
+            SavedPanel {
+                x: chat.x;
+                y: 0px;
+                width: chat.width;
+                height: parent.height;
+                visible: root.active-panel == Panel.saved;
+                entries: root.saved-rows;
+                error: root.local-error;
+            }
+
+            AppsPanel {
+                x: chat.x;
+                y: 0px;
+                width: chat.width;
+                height: parent.height;
+                visible: root.active-panel == Panel.apps;
+                error: root.app-launch-error;
+                pending: root.app-launch-pending;
+                launch(id) => { root.launch-app(id); }
+                settings => { root.show-panel(Panel.settings); }
+                system-specs => { root.show-panel(Panel.system-specs); }
+                command(text) => { root.run-local-command(text); }
+            }
+
+            HardwarePanel {
+                x: chat.x;
+                y: 0px;
+                width: chat.width;
+                height: parent.height;
+                visible: root.active-panel == Panel.system-specs;
+                rows: root.hardware-rows;
+                scanning: root.hardware-scanning;
+                error: root.hardware-error;
+                scan => { root.scan-hardware(); }
+            }
+
+            SettingsPanel {
+                x: chat.x;
+                y: 0px;
+                width: chat.width;
+                height: parent.height;
+                visible: root.active-panel == Panel.settings;
+                microphone-options: root.microphone-options;
+                speaker-options: root.speaker-options;
+                microphone-selection: root.microphone-selection;
+                speaker-selection: root.speaker-selection;
+                current-microphone: root.current-microphone;
+                current-speaker: root.current-speaker;
+                search-enabled: root.google-search-enabled;
+                reply-language: root.reply-language;
+                reply-length: root.reply-length;
+                show-captions: root.show-captions;
+                reduced-motion: root.reduced-motion;
+                memory-capture: root.memory-capture;
+                memory-error: root.memory-error;
+                saver-idle: root.saver-idle-label;
+                saver-preset: root.saver-preset;
+                saver-palette: root.saver-palette;
+                saver-dim: root.saver-dim-on-battery;
+                error: root.settings-error;
+                refresh => { root.refresh-settings(); }
+                select-device(input, device) => { root.select-audio-device(input, device); }
+                set-search(enabled) => { root.enable-google-search(enabled); }
+                conversation-setting(key, value) => { root.conversation-setting(key, value); }
+                configure-memory(enabled, clear) => { root.configure-memory(enabled, clear); }
+                saver-setting(key, value) => { root.save-saver-setting(key, value); }
+                preview-saver => { root.enter-saver(""); }
+            }
+
+            palette := CommandPalette {
+                x: chat.x;
+                width: chat.width;
+                height: parent.height;
+                visible: root.active-panel == Panel.command-palette;
+                entries: root.palette-rows;
+                target: root.desktop-target;
+                desktop-on: root.desktop-control;
+                result: root.command-result;
+                execute(text) => { root.run-local-command(text); }
+                search(query) => { root.search-palette(query); }
+                stop => { root.stop-desktop(); }
+            }
+
+            DailyPanel {
+                x: chat.x;
+                width: chat.width;
+                height: parent.height;
+                visible: root.active-panel == Panel.daily;
+                items: root.daily-rows;
+                notified: root.due-notice;
+                add-task(label) => { root.add-daily(label, false); }
+                add-reminder(label) => { root.add-daily(label, true); }
+                finish(id, checked) => { root.finish-daily(id, checked); }
+            }
+
+            RoutinePanel {
+                x: chat.x;
+                width: chat.width;
+                height: parent.height;
+                visible: root.active-panel == Panel.routines;
+                rows: root.routine-rows;
+                name <=> root.routine-name;
+                script <=> root.routine-script;
+                result: root.routine-result;
+                running: root.routine-running;
+                edit(action, name, value) => { root.routine-edit(action, name, value); }
+                stop => { root.stop-routine(); }
+            }
+
+            media-card := MediaPanel {
+                visible: root.media-active;
+                service: root.active-panel == Panel.youtube ? "YouTube" : "Spotify";
+                error: root.media-error;
+                audio-available: root.media-audio-available;
+                playing: root.media-playing;
+                muted: root.media-muted;
+                player-action: root.media-player-action;
+                reload => { root.reload-media(); }
+                open-external => { root.open-media-external(); }
+                toggle-mute => { root.toggle-media-mute(); }
+                switch-player => { root.switch-media-player(); }
+            }
+        }
+
+        footer := MicFooter {
+            x: 0px;
+            y: parent.height - self.height;
+            width: parent.width;
+            visible: root.chrome-visible && !root.memory-open;
+            gutter: root.gutter;
+            audio-state: root.audio-state;
+            device-name: root.device-name;
+            input-level: root.input-level;
+        }
+
+        if root.chrome-visible && !root.memory-open && root.desktop-error == "" && root.active-panel != Panel.command-palette &&
+            (root.command-result != "" || root.due-notice != ""): Text {
+            x: root.gutter + 4px;
+            y: content.y - 16px;
+            width: parent.width - 2 * root.gutter - 8px;
+            text: root.command-result != "" ? root.command-result : "Reminder due · " + root.due-notice;
+            color: #674694;
+            font-size: 11px;
+            overflow: elide;
+        }
+
+        memory := MemoryMaps {
+            visible: root.chrome-visible && root.memory-open;
+            graph: root.memory-graph;
+            frame: root.memory-frame;
+            error: root.local-error;
+            ripple: root.memory-ripple;
+            pulse: root.memory-pulse;
+            reduced-motion: root.reduced-motion;
+            learned-rows: root.learned-rows;
+            learned-detail: root.learned-detail;
+            memory-error: root.memory-error;
+            memory-search(query) => { root.search-memories(query); }
+            edit-memory(action, id, value) => { root.change-memory(action, id, value); }
+            select-memory(id) => { root.select-memory(id); }
+            open-source(id) => { root.open-memory-source(id); }
+            back => { root.dismiss-memory(); }
+        }
+
+        if root.desktop-error != "" && !root.memory-open && root.chrome-visible: Rectangle {
+            x: root.gutter;
+            y: header.height + 4px;
+            width: parent.width - 2 * root.gutter;
+            height: 28px;
+            border-radius: 7px;
+            background: #fdf0f0;
+
+            Text {
+                x: 9px;
+                width: parent.width - 18px;
+                text: root.desktop-error;
+                color: #842f3d;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+
+        Rectangle {
+            opacity: root.memory-flash ? 0.58 : 0.0;
+            animate opacity { duration: root.memory-flash ? 70ms : 120ms; easing: ease-out; }
+            background: #d7d0f6;
+            accessible-role: none;
+        }
+
+        saver := Screensaver {
+            visible: root.saver-active;
+            preset: root.active-saver-preset;
+            dimmed: root.saver-dimmed;
+            orb: root.orb;
+            clock: root.saver-clock;
+            period: root.saver-period;
+            date: root.saver-date;
+            timer: root.next-timer;
+            media: root.home-media;
+            tint: root.saver-tint;
+            drift: root.saver-drift;
+            ripple: root.saver-ripple;
+            edge-glow: root.saver-edge-glow;
+            show-clock: root.saver-show-clock;
+            show-date: root.saver-show-date;
+            show-orb: root.saver-show-orb;
+            show-timer: root.saver-show-timer;
+            show-media: root.saver-show-media;
+            leave => { root.exit-saver(); }
+        }
+
+        if root.power-request != "": Rectangle {
+            background: #edeaf7;
+            accessible-role: groupbox;
+            accessible-label: "Review requested action";
+            VerticalLayout {
+                x: (root.width - self.width) / 2;
+                y: (root.height - self.height) / 2;
+                width: min(400px, root.width - 44px);
+                height: self.preferred-height;
+                spacing: 12px;
+                Text { text: "Confirm action"; font-size: 23px; font-weight: 650; color: #21364c; }
+                ScrollView {
+                    height: min(280px, description.preferred-height + 16px);
+                    content-width: self.visible-width;
+                    content-height: description.preferred-height + 10px;
+                    horizontal-scrollbar-policy: always-off;
+                    description := Text { x: 0px; y: 4px; width: parent.width - 15px; text: root.power-request; color: #536b74; wrap: word-wrap; }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Button { text: "Cancel"; clicked => { root.power-decision(false); } }
+                    Button { text: "Confirm"; clicked => { root.power-decision(true); } }
+                }
+            }
+        }
+    }
+}

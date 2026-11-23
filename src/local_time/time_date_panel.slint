@@ -1,0 +1,96 @@
+import { ScrollView } from "std-widgets.slint";
+import { MonthCalendar, CalendarDay } from "calendar.slint";
+import { TimerList, TimerRow } from "../timers/timer_list.slint";
+
+export { CalendarDay }
+
+export component TimeDatePanel inherits Rectangle {
+    in property <string> month;
+    in property <[CalendarDay]> days;
+    in property <string> clock;
+    in property <string> date;
+    in property <[TimerRow]> timers;
+    in property <string> finished;
+    in property <string> error;
+    callback change-month(int);
+    callback cancel-timer(string);
+
+    property <bool> compact: self.height < 486px;
+
+    background: #f8fbfb;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: #e4ecee;
+
+    Text {
+        x: 20px;
+        y: 16px;
+        text: "Time & Date";
+        color: #142e3a;
+        font-size: 21px;
+        font-weight: 650;
+    }
+
+    scroll := ScrollView {
+        x: 20px;
+        y: 54px;
+        width: parent.width - 24px;
+        height: parent.height - self.y - 16px;
+        content-height: content.height;
+        horizontal-scrollbar-policy: always-off;
+
+        content := VerticalLayout {
+            x: 0px;
+            y: 0px;
+            width: scroll.width - 16px;
+            height: self.preferred-height;
+            spacing: root.compact ? 8px : 12px;
+
+            MonthCalendar {
+                month: root.month;
+                days: root.days;
+                compact: root.compact;
+                change-month(offset) => { root.change-month(offset); }
+            }
+
+            Rectangle {
+                height: root.compact ? 74px : 84px;
+                border-radius: 14px;
+                border-width: 1px;
+                border-color: #dcecea;
+                background: #edf7f5;
+
+                Text {
+                    x: 15px;
+                    y: root.compact ? 6px : 8px;
+                    text: "Local time";
+                    color: #356371;
+                    font-size: 12px;
+                    font-weight: 600;
+                }
+                Text {
+                    x: 15px;
+                    y: root.compact ? 19px : 22px;
+                    text: root.clock;
+                    color: #142e3a;
+                    font-size: root.compact ? 26px : 28px;
+                    font-weight: 650;
+                }
+                Text {
+                    x: 15px;
+                    y: root.compact ? 52px : 60px;
+                    text: root.date;
+                    color: #536b74;
+                    font-size: 12px;
+                }
+            }
+
+            TimerList {
+                timers: root.timers;
+                finished: root.finished;
+                error: root.error;
+                cancel-timer(id) => { root.cancel-timer(id); }
+            }
+        }
+    }
+}

@@ -1,0 +1,518 @@
+import { Button, ScrollView } from "std-widgets.slint";
+import { MemoryBorder } from "memory_border.slint";
+import { LearnedRow, RecentMemories } from "recent_memories.slint";
+
+export struct GraphNode { id: string, category: string, title: string, value: string, note: bool, fresh: bool, x: float, y: float, z: float, related-ids: [string] }
+export struct MemoryGraph { nodes: [GraphNode], note-count: int, preference-count: int }
+export struct GraphPoint { x: float, y: float, scale: float }
+export struct GraphFrame {
+    core: GraphPoint, notes: GraphPoint, preferences: GraphPoint, nodes: [GraphPoint],
+    note-links: string, preference-links: string, relationship-links: string
+}
+
+component GraphLinks inherits Path {
+    viewbox-width: 1000;
+    viewbox-height: 700;
+    stroke-width: 1.25px;
+    accessible-role: none;
+}
+
+component MapHub inherits Rectangle {
+    in property <string> label;
+    in property <color> accent;
+    in property <length> size: 16px;
+
+    width: self.size;
+    height: self.size;
+    border-radius: self.width / 2;
+    border-width: 1px;
+    border-color: root.accent.with-alpha(0.88);
+    background: @linear-gradient(138deg, #ffffff 0%, root.accent 45%, root.accent.darker(0.20) 100%);
+
+    Text {
+        width: self.preferred-width + 2px;
+        height: 24px;
+        y: root.height + 5px;
+        text: root.label;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        font-size: 12px;
+        font-weight: 650;
+        color: #223b50;
+    }
+}
+
+component MemoryNode inherits FocusScope {
+    in property <GraphNode> record;
+    in property <bool> selected;
+    in property <length> dot;
+    out property <bool> engaged: mouse.has-hover || root.has-focus;
+    callback select;
+
+    property <color> accent: root.record.note ? #32a3a5 : root.record.category == "Goal" ? #b46235 : root.record.category == "Project" ? #3677ba : root.record.category == "Routine" ? #548450 : root.record.category == "Interest" ? #ae477c : #8064cd;
+    property <bool> highlighted: root.engaged || root.selected || root.record.fresh;
+
+    accessible-role: button;
+    accessible-label: root.record.category + ", " + root.record.title;
+    accessible-action-default => { root.focus(); root.select(); }
+
+    key-released(event) => {
+        if (event.text == Key.Return || event.text == Key.Space) {
+            root.select();
+            return accept;
+        }
+        return reject;
+    }
+
+    Rectangle {
+        width: root.dot + (root.highlighted ? 4px : 0px);
+        height: self.width;
+        border-radius: self.width / 2;
+        border-width: 1px;
+        border-color: root.accent.with-alpha(root.highlighted ? 1.0 : 0.72);
+        background: @linear-gradient(138deg, #ffffff, root.accent 48%, root.accent.darker(0.22) 100%);
+    }
+
+    if root.highlighted && !root.selected: Rectangle {
+        y: parent.height + 1px;
+        width: min(210px, hover-label.preferred-width + 16px);
+        height: 25px;
+        border-radius: 6px;
+        border-width: 1px;
+        border-color: root.accent.with-alpha(0.35);
+        background: #fffffffa;
+        accessible-role: none;
+
+        hover-label := Text {
+            width: parent.width - 16px;
+            text: root.record.title;
+            color: #263e52;
+            font-size: 12px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+    }
+
+    mouse := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.focus(); root.select(); }
+    }
+}
+
+component MemoryDetails inherits Rectangle {
+    in property <GraphNode> record;
+
+    height: clamp(content.height + 47px, 104px, 184px);
+    border-width: 1px;
+    border-color: root.record.note ? #9bc9cb : #c3b6e9;
+    border-radius: 15px;
+    background: #fffffff7;
+    accessible-role: groupbox;
+    accessible-label: root.record.title;
+
+    Text {
+        x: 16px;
+        y: 10px;
+        width: parent.width - 32px;
+        height: 20px;
+        text: root.record.category;
+        font-size: 11px;
+        font-weight: 680;
+        color: root.record.note ? #236f73 : #6649ac;
+    }
+
+    view := ScrollView {
+        x: 16px;
+        y: 33px;
+        width: parent.width - 30px;
+        height: parent.height - self.y - 12px;
+        content-width: self.visible-width;
+        content-height: content.height;
+        horizontal-scrollbar-policy: always-off;
+        vertical-scrollbar-policy: as-needed;
+
+        content := VerticalLayout {
+            y: 0px;
+            width: view.visible-width - 14px;
+            height: self.preferred-height;
+            spacing: 7px;
+
+            Text {
+                text: root.record.title;
+                color: #21364c;
+                font-size: 15px;
+                font-weight: 680;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: root.record.value;
+                font-size: 13px;
+                color: #445a70;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+component MapControl inherits FocusScope {
+    in property <string> label;
+    in property <string> icon;
+    callback activate;
+
+    width: control-text.x + control-text.preferred-width + 13px;
+    height: 36px;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.activate(); }
+
+    key-released(event) => {
+        if (event.text == Key.Return || event.text == Key.Space) {
+            root.activate();
+            return accept;
+        }
+        return reject;
+    }
+
+    Rectangle {
+        border-width: 1px;
+        border-radius: 9px;
+        border-color: root.has-focus ? #779eae : #d6e3e9;
+        background: pointer.has-hover ? #edf6f8 : #ffffffed;
+    }
+
+    Path {
+        x: 12px;
+        width: 14px;
+        height: self.width;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        stroke-width: 1.5px;
+        stroke: #44677e;
+        commands: root.icon;
+    }
+
+    control-text := Text {
+        x: 33px;
+        width: self.preferred-width;
+        text: root.label;
+        font-size: 12px;
+        font-weight: 550;
+        color: #304b60;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+
+    pointer := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => { root.focus(); root.activate(); }
+    }
+}
+
+export component MemoryMaps inherits FocusScope {
+    in property <MemoryGraph> graph;
+    in property <GraphFrame> frame;
+    in-out property <float> yaw: 0.2;
+    in-out property <float> pitch: 0.16;
+    out property <bool> spinning: !root.reduced-motion && !root.show-list && !root.paused && !pan-area.pressed && root.selection < 0 && root.engaged-node < 0;
+    in property <string> error;
+    in property <string> ripple;
+    in property <float> pulse;
+    in property <bool> reduced-motion;
+    in property <[LearnedRow]> learned-rows;
+    in property <LearnedRow> learned-detail;
+    in property <string> memory-error;
+    callback memory-search(string);
+    callback edit-memory(string, string, string);
+    callback select-memory(string);
+    callback open-source(string);
+    callback back;
+
+    property <int> selection: -1;
+    property <int> engaged-node: -1;
+    property <bool> paused;
+    property <bool> show-list;
+    property <float> zoom: 1.0;
+    property <length> pan-x;
+    property <length> pan-y;
+    property <length> drag-x;
+    property <length> drag-y;
+    property <length> initial-pan-x;
+    property <length> initial-pan-y;
+    property <float> initial-yaw;
+    property <float> initial-pitch;
+    property <bool> panning;
+    property <bool> dragged;
+    property <length> scale: min(viewport.width / 1000, viewport.height / 700) * root.zoom;
+    property <int> total: root.graph.nodes.length;
+    property <float> max-zoom: clamp(sqrt(root.total) / 3.0, 3.0, 12.0);
+
+    public function focus-back() {
+        root.selection = -1;
+        root.engaged-node = -1;
+        back-button.focus();
+    }
+    public function open-recent() {
+        root.show-list = true;
+        root.memory-search("");
+    }
+
+    changed graph => {
+        root.selection = -1;
+        root.engaged-node = -1;
+    }
+
+    function engage(index: int, active: bool) {
+        if (active) {
+            root.engaged-node = index;
+        } else if (root.engaged-node == index) {
+            root.engaged-node = -1;
+        }
+    }
+
+    function select(index: int) {
+        if (root.graph.nodes[index].id != "") {
+            root.memory-search("");
+            root.select-memory(root.graph.nodes[index].id);
+            root.show-list = true;
+            return;
+        }
+        root.selection = root.selection == index ? -1 : index;
+    }
+
+    function pan-to(x: length, y: length) {
+        let limit-x = max(0px, (scene.width - viewport.width) / 2) + viewport.width * 0.24;
+        let limit-y = max(0px, (scene.height - viewport.height) / 2) + viewport.height * 0.24;
+        root.pan-x = clamp(x, -limit-x, limit-x);
+        root.pan-y = clamp(y, -limit-y, limit-y);
+    }
+
+    key-pressed(event) => {
+        if (event.text == Key.Escape) {
+            if (root.show-list) {
+                root.show-list = false;
+            } else if (root.selection >= 0) {
+                root.selection = -1;
+            } else {
+                root.back();
+            }
+            return accept;
+        }
+        return reject;
+    }
+
+    Rectangle {
+        background: #fbfdfe;
+    }
+
+    viewport := Rectangle {
+        x: 24px;
+        y: 77px;
+        width: parent.width - 48px;
+        height: parent.height - self.y - 42px;
+        clip: true;
+        visible: !root.show-list;
+        accessible-role: main;
+        accessible-label: "Memory graph";
+
+        pan-area := TouchArea {
+            mouse-cursor: self.pressed ? MouseCursor.move : MouseCursor.default;
+
+            pointer-event(event) => {
+                if (event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
+                    root.drag-x = self.mouse-x;
+                    root.drag-y = self.mouse-y;
+                    root.initial-pan-x = root.pan-x;
+                    root.initial-pan-y = root.pan-y;
+                    root.initial-yaw = root.yaw;
+                    root.initial-pitch = root.pitch;
+                    root.panning = event.modifiers.shift;
+                    root.dragged = false;
+                }
+            }
+
+            moved => {
+                if (self.pressed) {
+                    let dx = self.mouse-x - root.drag-x;
+                    let dy = self.mouse-y - root.drag-y;
+                    if (root.dragged || abs(dx) + abs(dy) > 4px) {
+                        root.dragged = true;
+                        if (root.panning) {
+                            root.pan-to(root.initial-pan-x + dx, root.initial-pan-y + dy);
+                        } else {
+                            root.yaw = root.initial-yaw - dx / 155px;
+                            root.pitch = clamp(root.initial-pitch + dy / 155px, -1.42, 1.42);
+                        }
+                    }
+                }
+            }
+
+            clicked => {
+                if (!root.dragged) {
+                    root.selection = -1;
+                    root.focus();
+                }
+            }
+
+            scroll-event(event) => {
+                if (event.delta-y == 0px) { return reject; }
+                let next = clamp(root.zoom * (1.0 + clamp(event.delta-y / 540px, -0.22, 0.22)), 1.0, root.max-zoom);
+                let ratio = next / root.zoom;
+                let mx = self.mouse-x - viewport.width / 2;
+                let my = self.mouse-y - viewport.height / 2;
+                let x = mx - (mx - root.pan-x) * ratio;
+                let y = my - (my - root.pan-y) * ratio;
+                root.zoom = next;
+                root.pan-to(x, y);
+                return accept;
+            }
+        }
+
+        scene := Rectangle {
+            x: (parent.width - self.width) / 2 + root.pan-x;
+            y: (parent.height - self.height) / 2 + root.pan-y;
+            width: root.scale * 1000;
+            height: root.scale * 700;
+            visible: root.frame.core.scale > 0;
+
+            GraphLinks {
+                commands: root.frame.note-links;
+                stroke: #32919666;
+            }
+
+            GraphLinks {
+                commands: root.frame.preference-links;
+                stroke: #8266bd66;
+            }
+            GraphLinks {
+                commands: root.frame.relationship-links;
+                stroke: #a06dd5be;
+            }
+
+            MapHub {
+                x: parent.width * 0.5 - self.width / 2;
+                y: parent.height * 0.5 - self.height / 2;
+                size: 22px;
+                label: "Amica";
+                accent: #3c82a5;
+            }
+
+            MapHub {
+                x: root.scale * root.frame.notes.x - self.width / 2;
+                y: root.scale * root.frame.notes.y - self.height / 2;
+                size: 16px * root.frame.notes.scale;
+                label: "Notes";
+                accent: #2da4a5;
+            }
+
+            MapHub {
+                x: root.scale * root.frame.preferences.x - self.width / 2;
+                y: root.scale * root.frame.preferences.y - self.height / 2;
+                size: 16px * root.frame.preferences.scale;
+                label: "Preferences & learned memories";
+                accent: #8266ce;
+            }
+
+            for row[index] in root.graph.nodes: MemoryNode {
+                property <GraphPoint> position: index < root.frame.nodes.length ? root.frame.nodes[index] : {x: 0.0, y: 0.0, scale: 1.0};
+                visible: index < root.frame.nodes.length;
+                x: root.scale * self.position.x - self.width / 2;
+                y: root.scale * self.position.y - self.height / 2;
+                width: clamp(root.scale * 175 / sqrt(max(1, root.total)) * self.position.scale, 15px, 28px);
+                height: self.width;
+                dot: clamp(self.width * 0.45 * self.position.scale, 6px, 14px);
+                opacity: self.engaged || self.selected ? 1.0 : clamp(self.position.scale * 0.62 + 0.23, 0.62, 1.0);
+                record: row;
+                selected: root.selection == index;
+                changed engaged => { root.engage(index, self.engaged); }
+                select => { root.select(index); }
+            }
+        }
+    }
+
+    back-button := MapControl {
+        x: 32px;
+        y: 27px;
+        label: "Back";
+        icon: "M 13 8 L 3 8 M 7 4 L 3 8 L 7 12";
+        activate => { root.back(); }
+    }
+
+    MapControl {
+        x: parent.width - self.width - 32px;
+        y: back-button.y;
+        label: root.paused ? "Resume rotation" : "Pause rotation";
+        visible: !root.show-list && !root.reduced-motion;
+        icon: root.paused ? "M 5 3.5 L 12 8 L 5 12.5 Z" : "M 5.5 3.5 L 5.5 12.5 M 10.5 3.5 L 10.5 12.5";
+        activate => {
+            root.paused = !root.paused;
+            if (!root.paused) {
+                root.selection = -1;
+            }
+        }
+    }
+
+    Button {
+        x: parent.width - self.width - (root.show-list || root.reduced-motion ? 32px : 185px);
+        y: back-button.y;
+        height: 36px;
+        text: root.show-list ? "Memory Map" : "Recent Memories";
+        clicked => { root.show-list = !root.show-list; root.memory-search(""); }
+    }
+
+    if root.show-list: RecentMemories {
+        x: 24px;
+        y: 78px;
+        width: parent.width - 48px;
+        height: parent.height - 101px;
+        rows: root.learned-rows;
+        detail: root.learned-detail;
+        error: root.memory-error;
+        search(query) => { root.memory-search(query); }
+        change(action, id, value) => { root.edit-memory(action, id, value); }
+        select(id) => { root.select-memory(id); }
+        open-source(id) => { root.open-source(id); }
+    }
+
+    Text {
+        x: back-button.x + back-button.width + 18px;
+        y: 25px;
+        height: 26px;
+        text: root.show-list ? "Recent Memories" : "Memory Map";
+        font-size: 20px;
+        font-weight: 680;
+        color: #21364c;
+        vertical-alignment: center;
+    }
+
+    Text {
+        x: back-button.x + back-button.width + 19px;
+        y: 52px;
+        text: root.graph.note-count + (root.graph.note-count == 1 ? " note" : " notes") + "  ·  "
+            + root.graph.preference-count + (root.graph.preference-count == 1 ? " preference" : " preferences");
+        font-size: 11px;
+        color: #546a80;
+    }
+
+    Text {
+        x: 33px;
+        y: parent.height - 39px;
+        visible: !root.show-list;
+        height: 19px;
+        text: root.error != "" ? root.error : root.total == 0 ? "No saved memories yet" : "Drag to rotate  ·  Scroll to zoom  ·  Shift + drag to pan";
+        font-size: 11px;
+        color: root.error != "" ? #a44856 : #546a80;
+        vertical-alignment: center;
+    }
+
+    if !root.show-list && root.selection >= 0 && root.selection < root.total: MemoryDetails {
+        x: parent.width - self.width - 32px;
+        y: parent.height - self.height - 30px;
+        width: min(360px, parent.width * 0.42);
+        record: root.graph.nodes[root.selection];
+    }
+
+    MemoryBorder { ripple: root.ripple; pulse: root.pulse; }
+}

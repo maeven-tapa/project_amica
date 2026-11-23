@@ -1,0 +1,68 @@
+import { Button } from "std-widgets.slint";
+
+export struct TimerRow { id: string, label: string, countdown: string }
+
+export component TimerList inherits VerticalLayout {
+    in property <[TimerRow]> timers;
+    in property <string> finished;
+    in property <string> error;
+    callback cancel-timer(string);
+
+    spacing: 8px;
+
+    Text {
+        text: "Timers";
+        color: #142e3a;
+        font-size: 15px;
+        font-weight: 650;
+    }
+
+    if root.error != "" || root.finished != "": Text {
+        text: root.error != "" ? root.error : "Timer finished · " + root.finished;
+        color: root.error != "" ? #952f42 : #674694;
+        font-size: 13px;
+        font-weight: 600;
+        wrap: word-wrap;
+    }
+
+    if root.timers.length == 0 && root.error == "": Text {
+        text: "Ask Amica to set a timer.";
+        color: #536b74;
+        font-size: 14px;
+    }
+
+    for timer in root.timers: Rectangle {
+        height: 56px;
+        background: white;
+        border-radius: 11px;
+        border-width: 1px;
+        border-color: #e4ecee;
+
+        Text {
+            x: 12px;
+            y: 9px;
+            width: parent.width - 110px;
+            text: timer.label;
+            color: #142e3a;
+            font-size: 13px;
+            font-weight: 650;
+            overflow: elide;
+        }
+        Text {
+            x: 12px;
+            y: 29px;
+            text: timer.countdown;
+            color: #356371;
+            font-size: 14px;
+        }
+        Button {
+            x: parent.width - 83px;
+            y: 12px;
+            width: 70px;
+            height: 32px;
+            text: "Cancel";
+            accessible-label: "Cancel " + timer.label;
+            clicked => { root.cancel-timer(timer.id); }
+        }
+    }
+}

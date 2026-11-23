@@ -1,0 +1,29 @@
+export component MemoryHoldArea inherits TouchArea {
+    in property <bool> inside: true;
+    callback hold-changed(bool);
+
+    property <bool> holding;
+    property <bool> contained: root.inside
+        && self.mouse-x >= 0px && self.mouse-x < self.width
+        && self.mouse-y >= 0px && self.mouse-y < self.height;
+
+    function cancel-hold() {
+        if (root.holding) {
+            root.holding = false;
+            root.hold-changed(false);
+        }
+    }
+
+    changed contained => {
+        if (!root.contained) { root.cancel-hold(); }
+    }
+
+    pointer-event(event) => {
+        if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left && root.contained) {
+            root.holding = true;
+            root.hold-changed(true);
+        } else if (event.kind == PointerEventKind.cancel || (event.kind == PointerEventKind.up && event.button == PointerEventButton.left)) {
+            root.cancel-hold();
+        }
+    }
+}

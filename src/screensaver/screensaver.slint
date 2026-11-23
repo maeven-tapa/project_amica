@@ -1,0 +1,158 @@
+import { SaverDashboard } from "dashboard.slint";
+import { DigitalClock } from "clock.slint";
+import { MemoryBorder } from "../memory/memory_border.slint";
+
+component Backdrop inherits Rectangle {
+    in property <color> tint;
+    in property <float> drift;
+
+    clip: true;
+    background: @linear-gradient(154deg, #10182d 0%, #151e38 43%, #090f20 100%);
+    accessible-role: none;
+
+    Rectangle {
+        x: parent.width * (-0.35 + root.drift * 0.018);
+        y: -parent.height * 0.55;
+        width: parent.width * 1.70;
+        height: parent.height * 1.60;
+        background: @radial-gradient(circle, root.tint.brighter(0.38).with-alpha(0.86) 0%, root.tint.with-alpha(0.60) 25%, #18213b00 65%);
+    }
+
+    Rectangle {
+        x: parent.width * (-0.81 - root.drift * 0.014);
+        y: -parent.height * 0.13;
+        width: parent.width * 1.90;
+        height: parent.height * 1.74;
+        background: @radial-gradient(circle, #3477939c 0%, #37659f48 29%, #213a5500 59%);
+    }
+
+    Rectangle {
+        x: parent.width * (-0.08 + root.drift * 0.016);
+        y: -parent.height * 0.021;
+        width: parent.width * 1.78;
+        height: parent.height * 1.93;
+        background: @radial-gradient(circle, #9e65816a 0%, #604b9a48 28%, #33244400 60%);
+    }
+}
+
+export component Screensaver inherits FocusScope {
+    in property <string> preset: "Dashboard";
+    in property <bool> dimmed;
+    in property <image> orb;
+    in property <string> clock;
+    in property <string> period;
+    in property <string> date;
+    in property <string> timer;
+    in property <string> media;
+    in property <color> tint: #32264f;
+    in property <float> drift;
+    in property <string> ripple;
+    in property <float> edge-glow;
+    in property <bool> show-clock: true;
+    in property <bool> show-date: true;
+    in property <bool> show-orb: true;
+    in property <bool> show-timer: true;
+    in property <bool> show-media: true;
+    out property <bool> show-ripple: root.preset != "Dashboard";
+    out property <length> ripple-width: max(0px, self.width - 2 * root.ripple-inset);
+    out property <length> ripple-height: max(0px, self.height - 2 * root.ripple-inset);
+    property <length> ripple-inset: 9px;
+    callback leave;
+    accessible-role: main;
+    accessible-label: "Amica screensaver";
+
+    key-pressed(event) => {
+        if (event.text != "") { root.leave(); return accept; }
+        return reject;
+    }
+
+    if root.preset == "Black Clock": Rectangle { background: black; }
+
+    if root.preset != "Black Clock": Backdrop {
+        tint: root.tint;
+        drift: root.drift;
+    }
+
+    if root.preset == "Dashboard": SaverDashboard {
+        x: (parent.width - self.width) / 2 + root.drift * 5px;
+        y: (parent.height - self.height) / 2 + root.drift * 4px;
+        width: min(920px, parent.width - 64px);
+        height: min(640px, parent.height - 64px);
+        drift: root.drift;
+        orb: root.orb;
+        clock: root.clock;
+        period: root.period;
+        date: root.date;
+        timer: root.timer;
+        media: root.media;
+        show-clock: root.show-clock;
+        show-date: root.show-date;
+        show-orb: root.show-orb;
+        show-timer: root.show-timer;
+        show-media: root.show-media;
+    }
+
+    if root.preset == "Ambient": Rectangle {
+        x: (parent.width - self.width) / 2 + root.drift * 32px;
+        y: (parent.height - self.height) / 2 + root.drift * 10px;
+        width: min(root.width - 32px, 700px);
+        height: min(root.height - 48px, 490px);
+        Image {
+            x: (parent.width - self.width) / 2;
+            y: 0px;
+            width: min(296px, min(parent.width * 0.76, parent.height * 0.58));
+            height: self.width;
+            source: root.orb;
+            image-fit: contain;
+            opacity: 0.82;
+            accessible-role: none;
+        }
+        DigitalClock {
+            x: 0px;
+            y: parent.height * 0.58;
+            width: parent.width;
+            height: parent.height * 0.32;
+            digits: root.clock;
+            period: root.period;
+            date: root.date;
+            digit-size: clamp(min(parent.width * 0.16, parent.height * 0.21), 40px, 96px);
+            ink: #f5efff;
+            secondary: #dfd5fc;
+        }
+        if root.show-timer && root.timer != "": Text {
+            x: 0px;
+            y: parent.height * 0.91;
+            width: parent.width;
+            text: "Timer · " + root.timer;
+            color: #dfd5fc;
+            horizontal-alignment: center;
+        }
+    }
+
+    if root.preset == "Black Clock": DigitalClock {
+        x: (parent.width - self.width) / 2 + root.drift * 10px;
+        y: (parent.height - self.height) / 2 - 24px + root.drift * 4px;
+        width: min(1000px, parent.width - 64px);
+        height: clamp(parent.height * 0.33, 140px, 280px);
+        digits: root.clock;
+        period: root.period;
+        date: root.date;
+        digit-size: clamp(min(parent.width * 0.15, parent.height * 0.19), 54px, 190px);
+        date-size: clamp(parent.width * 0.018, 15px, 24px);
+        ink: #f8f8fb;
+        secondary: #b8b9c1;
+    }
+
+    if root.show-ripple: MemoryBorder {
+        x: root.ripple-inset;
+        y: root.ripple-inset;
+        width: root.ripple-width;
+        height: root.ripple-height;
+        saver-look: true;
+        ripple: root.ripple;
+        pulse: root.edge-glow;
+    }
+
+    if root.dimmed: Rectangle { background: #03061155; accessible-role: none; }
+    TouchArea { clicked => { root.leave(); } }
+}

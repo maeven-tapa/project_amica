@@ -1,0 +1,152 @@
+import { Button, ComboBox, LineEdit, ListView, ScrollView } from "std-widgets.slint";
+
+export struct LearnedSource { id: string, label: string, excerpt: string }
+export struct LearnedRow {
+    id: string, category: string, scope: string, claim: string, pinned: bool, fresh: bool,
+    updated: string, status: string, related: string, sources: [LearnedSource], related-ids: [string]
+}
+
+export component RecentMemories inherits Rectangle {
+    in property <[LearnedRow]> rows;
+    in property <string> error;
+    in property <LearnedRow> detail;
+    property <string> selected: root.detail.id;
+    callback search(string);
+    callback change(string, string, string);
+    callback open-source(string);
+    callback select(string);
+    property <bool> forgetting;
+    property <bool> editing;
+    property <bool> linking;
+    property <string> relation: "supports";
+
+    changed selected => { root.forgetting = false; root.editing = false; root.linking = false; }
+    background: #fbfdfe;
+    border-radius: 12px;
+
+    HorizontalLayout {
+        padding: 8px;
+        spacing: 18px;
+        VerticalLayout {
+            width: min(root.width * 0.42, 350px);
+            spacing: 8px;
+            LineEdit {
+                placeholder-text: "Search learned memories";
+                accessible-label: "Search learned memories";
+                edited(value) => { root.search(value); }
+            }
+            if root.rows.length == 0: Text {
+                text: "No matching learned memories.";
+                color: #546a80;
+                wrap: word-wrap;
+            }
+            ListView {
+                vertical-stretch: 1;
+                for row in root.rows: VerticalLayout {
+                    padding-bottom: 6px;
+                    Button {
+                        text: (row.pinned ? "Pinned · " : "") + row.category + " · " + row.scope;
+                        clicked => { root.select(row.id); }
+                    }
+                    Text {
+                        text: row.claim;
+                        color: root.selected == row.id ? #5c36a0 : #21364c;
+                        wrap: word-wrap;
+                        font-size: 12px;
+                    }
+                }
+            }
+        }
+        view := ScrollView {
+            horizontal-scrollbar-policy: always-off;
+            content-width: self.visible-width;
+            content-height: max(self.visible-height, body.height);
+            body := VerticalLayout {
+                x: 0px;
+                y: 0px;
+                width: view.visible-width - 12px;
+                height: self.preferred-height;
+                spacing: 8px;
+                Text {
+                    text: root.detail.id == "" ? "Select a memory to see its sources." : root.detail.category + " · " + root.detail.scope;
+                    color: #21364c;
+                    font-size: 17px;
+                    font-weight: 650;
+                    wrap: word-wrap;
+                }
+                if root.detail.id != "": VerticalLayout {
+                    spacing: 8px;
+                    Text { text: root.detail.claim; color: #21364c; wrap: word-wrap; }
+                    Text {
+                        text: "Learned from conversation · " + root.detail.updated + root.detail.status;
+                        color: #546a80;
+                        wrap: word-wrap;
+                    }
+                    HorizontalLayout {
+                        alignment: start;
+                        spacing: 8px;
+                        Button { text: "Edit"; clicked => { root.editing = !root.editing; root.forgetting = false; } }
+                        Button { text: root.detail.pinned ? "Unpin" : "Pin"; clicked => { root.change("pin", root.selected, ""); } }
+                        Button { text: "Forget"; clicked => { root.forgetting = !root.forgetting; root.editing = false; } }
+                    }
+                    if root.editing: HorizontalLayout {
+                        spacing: 6px;
+                        edit-field := LineEdit { text: root.detail.claim; accessible-label: "Correct memory"; }
+                        Button {
+                            text: "Save edit";
+                            enabled: edit-field.text != "";
+                            clicked => { root.change("edit", root.selected, edit-field.text); root.editing = false; }
+                        }
+                    }
+                    if root.forgetting: VerticalLayout {
+                        spacing: 6px;
+                        Text { text: "Remove this memory? You can also delete its source turns."; wrap: word-wrap; }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            Button { text: "Forget memory"; clicked => { root.change("forget", root.selected, ""); } }
+                            Button { text: "Forget + delete sources"; clicked => { root.change("delete", root.selected, ""); } }
+                        }
+                    }
+                    if root.detail.related != "": Text {
+                        text: root.detail.related;
+                        color: #674694;
+                        wrap: word-wrap;
+                    }
+                    if root.rows.length > 1: Button {
+                        text: root.linking ? "Done editing relationships" : "Edit relationships";
+                        clicked => { root.linking = !root.linking; }
+                    }
+                    if root.linking: VerticalLayout {
+                        spacing: 6px;
+                        ComboBox {
+                            model: ["supports", "belongs to", "supersedes"];
+                            current-value: root.relation;
+                            accessible-label: "Memory relationship";
+                            selected(value) => { root.relation = value; }
+                        }
+                        for other in root.rows: VerticalLayout {
+                            visible: other.id != root.selected;
+                            Text { text: other.claim; wrap: word-wrap; color: #21364c; }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                Button { text: "Add link"; clicked => { root.change("link", root.selected, other.id + ":" + root.relation); } }
+                                Button { text: "Remove link"; clicked => { root.change("unlink", root.selected, other.id + ":" + root.relation); } }
+                            }
+                        }
+                    }
+                    Text { text: "Sources and changes"; color: #21364c; font-weight: 650; }
+                    for source in root.detail.sources: VerticalLayout {
+                        spacing: 4px;
+                        Text { text: source.label; color: #546a80; wrap: word-wrap; }
+                        Text { text: source.excerpt; color: #21364c; wrap: word-wrap; }
+                        HorizontalLayout {
+                            alignment: start;
+                            Button { text: "Open source"; clicked => { root.open-source(source.id); } }
+                        }
+                    }
+                }
+                if root.error != "": Text { text: root.error; color: #983d49; wrap: word-wrap; }
+            }
+        }
+    }
+}

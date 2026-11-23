@@ -1,0 +1,60 @@
+export component DigitalClock inherits VerticalLayout {
+    in property <string> digits;
+    in property <string> period;
+    in property <string> date;
+    in property <length> digit-size: 84px;
+    in property <length> date-size: 17px;
+    in property <color> ink: #f8f9ff;
+    in property <color> secondary: #c6cde3;
+
+    spacing: 1px;
+    alignment: center;
+
+    if root.date != "": Rectangle {
+        height: date-label.preferred-height;
+
+        date-label := Text {
+            y: root.digits == "" ? 0px : root.digit-size * 0.11;
+            width: parent.width;
+            height: self.preferred-height;
+            text: root.date;
+            font-family: "Segoe UI Variable Display";
+            color: root.secondary;
+            font-size: root.date-size;
+            font-weight: 550;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+    }
+
+    if root.digits != "": HorizontalLayout {
+        height: numerals.preferred-height;
+        spacing: root.digit-size * 0.08;
+        alignment: center;
+
+        numerals := Text {
+            text: root.digits;
+            font-family: "Segoe UI Variable Display";
+            color: root.ink;
+            font-size: root.digit-size;
+            font-weight: 430;
+            vertical-alignment: center;
+        }
+
+        Rectangle {
+            width: meridiem.preferred-width;
+
+            meridiem := Text {
+                x: 0px;
+                y: parent.height - self.preferred-height - root.digit-size * 0.20;
+                width: self.preferred-width;
+                height: self.preferred-height;
+                text: root.period;
+                font-family: "Segoe UI Variable Display";
+                font-size: root.digit-size * 0.21;
+                font-weight: 600;
+                color: root.secondary;
+            }
+        }
+    }
+}

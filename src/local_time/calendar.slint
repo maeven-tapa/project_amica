@@ -1,0 +1,91 @@
+import { Button } from "std-widgets.slint";
+
+export struct CalendarDay { label: string, is-today: bool }
+
+export component MonthCalendar inherits Rectangle {
+    in property <string> month;
+    in property <[CalendarDay]> days;
+    in property <bool> compact;
+    callback change-month(int);
+
+    height: root.compact ? 183px : 218px;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: #e4ecee;
+    background: #ffffff;
+    accessible-role: groupbox;
+    accessible-label: "Calendar";
+
+    Text {
+        x: 15px;
+        y: 10px;
+        width: parent.width - 108px;
+        height: 32px;
+        text: root.month;
+        color: #142e3a;
+        font-size: 16px;
+        font-weight: 650;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    Button {
+        x: parent.width - 84px;
+        y: 10px;
+        width: 32px;
+        height: 32px;
+        text: "‹";
+        accessible-label: "Previous month";
+        clicked => { root.change-month(-1); }
+    }
+    Button {
+        x: parent.width - 46px;
+        y: 10px;
+        width: 32px;
+        height: 32px;
+        text: "›";
+        accessible-label: "Next month";
+        clicked => { root.change-month(1); }
+    }
+
+    Rectangle {
+        x: 12px;
+        y: root.compact ? 44px : 49px;
+        width: parent.width - 24px;
+        property <length> column-width: self.width / 7;
+        property <length> row-height: root.compact ? 19px : 23px;
+
+        for weekday[index] in ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]: Text {
+            x: index * parent.column-width;
+            y: 0px;
+            width: parent.column-width;
+            height: 19px;
+            text: weekday;
+            color: #536b74;
+            font-size: 11px;
+            font-weight: 650;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        for day[index] in root.days: Rectangle {
+            x: mod(index, 7) * parent.column-width + (parent.column-width - self.width) / 2;
+            y: 20px + floor(index / 7) * parent.row-height;
+            width: 27px;
+            height: parent.row-height - 1px;
+            border-radius: 7px;
+            background: day.is-today ? #dcefeb : transparent;
+            visible: day.label != "";
+
+            Text {
+                text: day.label;
+                accessible-label: day.is-today ? "Today, " + day.label : day.label;
+                color: day.is-today ? #163f47 : #355661;
+                font-size: 12px;
+                font-weight: day.is-today ? 700 : 500;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

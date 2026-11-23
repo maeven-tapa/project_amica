@@ -1,0 +1,173 @@
+import { DigitalClock } from "clock.slint";
+
+component StatusTile inherits Rectangle {
+    in property <string> name;
+    in property <string> detail;
+    in property <string> symbol;
+    in property <color> accent;
+    in property <color> icon-fill;
+
+    border-radius: 24px;
+    border-width: 1px;
+    border-color: #ffffff80;
+    background: @linear-gradient(160deg, #f7f9ffdf 0%, #d6dff5bd 100%);
+    clip: true;
+
+    icon := Rectangle {
+        x: root.width < 225px ? 12px : 19px;
+        y: (parent.height - self.height) / 2;
+        width: root.width < 225px ? 32px : 42px;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: root.icon-fill;
+
+        Path {
+            width: parent.width * 0.52;
+            height: self.width;
+            viewbox-width: 24;
+            viewbox-height: 24;
+            stroke: root.accent;
+            stroke-width: 1.8px;
+            commands: root.symbol;
+            accessible-role: none;
+        }
+    }
+
+    VerticalLayout {
+        x: icon.x + icon.width + (root.width < 225px ? 8px : 13px);
+        width: max(0px, parent.width - self.x - 12px);
+        alignment: center;
+        spacing: 3px;
+        Text {
+            text: root.name;
+            font-family: "Segoe UI Variable Display";
+            color: #181d30;
+            font-size: root.width < 225px ? 14px : 17px;
+            font-weight: 650;
+            overflow: elide;
+        }
+        Text {
+            text: root.detail;
+            font-family: "Segoe UI Variable Display";
+            color: #37445d;
+            font-size: root.width < 225px ? 12px : 14px;
+            font-weight: 500;
+            overflow: elide;
+        }
+    }
+}
+
+export component SaverDashboard inherits Rectangle {
+    in property <image> orb;
+    in property <string> clock;
+    in property <string> period;
+    in property <string> date;
+    in property <string> timer;
+    in property <string> media;
+    in property <float> drift;
+    in property <bool> show-clock: true;
+    in property <bool> show-date: true;
+    in property <bool> show-orb: true;
+    in property <bool> show-timer: true;
+    in property <bool> show-media: true;
+
+    property <bool> compact: self.width < 610px;
+    property <bool> heading-visible: root.show-clock || root.show-date;
+    property <bool> has-status: root.show-timer || root.show-media;
+    property <bool> has-tiles: root.show-orb || root.has-status;
+    property <length> tile-gap: root.compact ? 10px : 16px;
+    property <length> heading-height: !root.heading-visible ? 0px : !root.show-clock ? 44px : clamp(self.height * 0.30, 104px, 179px);
+    property <length> tile-height: root.show-orb ? min(272px, self.height - root.heading-height - root.tile-gap) : 84px;
+    property <length> section-gap: root.heading-visible && root.has-tiles ? root.tile-gap : 0px;
+    property <length> total-height: root.heading-height + root.section-gap + (root.has-tiles ? root.tile-height : 0px);
+
+    property <length> content-top: (self.height - root.total-height) / 2;
+
+    if root.heading-visible: DigitalClock {
+        x: 0px;
+        y: root.content-top;
+        width: parent.width;
+        height: root.heading-height;
+        digits: root.show-clock ? root.clock : "";
+        period: root.period;
+        date: root.show-date ? root.date : "";
+        digit-size: clamp(root.width * 0.112, 54px, 105px);
+        date-size: root.compact ? 15px : 20px;
+    }
+
+    if root.has-tiles: Rectangle {
+        x: 0px;
+        y: root.content-top + root.heading-height + root.section-gap;
+        width: parent.width;
+        height: root.tile-height;
+        property <length> hero-height: root.compact && root.has-status ? self.height - 78px - root.tile-gap : self.height;
+        property <length> hero-width: root.compact || !root.has-status ? self.width : (self.width - root.tile-gap) * 0.59;
+        property <length> status-top: root.compact && root.show-orb ? self.hero-height + root.tile-gap : 0px;
+        property <length> status-left: !root.compact && root.show-orb ? self.hero-width + root.tile-gap : 0px;
+        property <bool> horizontal-status: root.compact || !root.show-orb;
+        property <length> status-width: self.horizontal-status && root.show-timer && root.show-media ? (self.width - root.tile-gap) / 2 : self.width - self.status-left;
+        property <length> status-height: !self.horizontal-status && root.show-timer && root.show-media ? (self.height - root.tile-gap) / 2 : self.height - self.status-top;
+
+        if root.show-orb: Rectangle {
+            x: 0px;
+            y: 0px;
+            width: parent.hero-width;
+            height: parent.hero-height;
+            background: @linear-gradient(148deg, #dee8f9bc 0%, #a6b8de8c 49%, #697da8a6 100%);
+            border-radius: 28px;
+            border-width: 1px;
+            border-color: #e8f1ff80;
+            clip: true;
+
+            Rectangle {
+                background: @radial-gradient(circle, #cdecef82 0%, #cedffa36 37%, #8da9ce00 75%);
+                accessible-role: none;
+            }
+
+            Image {
+                source: root.orb;
+                x: (parent.width - self.width) / 2 + root.drift * 4px;
+                y: (parent.height - self.height) / 2 + 3px + root.drift * 2px;
+                width: min(parent.width * 0.82, parent.height * 0.94);
+                height: self.width;
+                image-fit: contain;
+                accessible-role: image;
+                accessible-label: "Amica orb";
+            }
+
+            Text {
+                x: 19px;
+                y: 15px;
+                text: "Amica";
+                font-family: "Segoe UI Variable Display";
+                font-size: 18px;
+                font-weight: 650;
+                color: #16213a;
+            }
+        }
+
+        if root.show-timer: StatusTile {
+            x: parent.status-left;
+            y: parent.status-top;
+            width: parent.status-width;
+            height: parent.status-height;
+            name: "Timer";
+            detail: root.timer == "" ? "No active timer" : root.timer;
+            accent: #815117;
+            icon-fill: #f6dfa9;
+            symbol: "M 10 3 H 14 M 12 3 V 6 M 18 8 L 20 6 M 12 10 V 14 L 15 16 M 12 6 A 7.5 7.5 0 1 1 11.99 6 Z";
+        }
+
+        if root.show-media: StatusTile {
+            x: parent.status-left + (root.show-timer && parent.horizontal-status ? parent.status-width + root.tile-gap : 0px);
+            y: parent.status-top + (root.show-timer && !parent.horizontal-status ? parent.status-height + root.tile-gap : 0px);
+            width: parent.status-width;
+            height: parent.status-height;
+            name: "Now Playing";
+            detail: root.media;
+            accent: #27645d;
+            icon-fill: #bde9dd;
+            symbol: "M 9 17 V 7 L 19 5 V 15 M 9 17 C 9 19 5 20 4 18.5 C 3 16.5 8 15 9 17 M 19 15 C 19 17 15 18 14 16.5 C 13 14.5 18 13 19 15";
+        }
+    }
+}

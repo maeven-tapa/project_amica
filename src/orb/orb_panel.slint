@@ -1,0 +1,136 @@
+import { AudioState, MicButton } from "../microphone/microphone.slint";
+import { VoiceState } from "../voice/voice.slint";
+import { Button } from "std-widgets.slint";
+import { MemoryHoldArea } from "../memory/hold_area.slint";
+
+export component OrbPanel inherits Rectangle {
+    in property <image> orb;
+    in property <AudioState> audio-state;
+    in property <string> audio-message;
+    in property <bool> chat-thinking;
+    in property <VoiceState> voice-state;
+    in property <string> voice-error;
+    in property <bool> can-type;
+    in property <bool> memory-charging;
+    in property <bool> memory-flash;
+    out property <bool> hovered: orb-pointer.has-hover && root.inside-orb;
+    out property <float> pointer-x: root.hovered ? root.local-x : 0.0;
+    out property <float> pointer-y: root.hovered ? root.local-y : 0.0;
+    callback toggle-microphone;
+    callback open-chat;
+    callback open-memory;
+    callback hold-memory(bool);
+
+    property <bool> thinking: root.chat-thinking || root.voice-state == VoiceState.thinking;
+    property <float> local-x: 2.0 * orb-pointer.mouse-x / max(1px, orb-pointer.width) - 1.0;
+    property <float> local-y: 2.0 * orb-pointer.mouse-y / max(1px, orb-pointer.height) - 1.0;
+    property <bool> inside-orb: root.local-x * root.local-x + root.local-y * root.local-y <= 1.0;
+    property <float> activation-scale: root.memory-flash ? 1.14 : root.memory-charging ? 1.075 : 1.0;
+    animate activation-scale { duration: root.memory-charging && !root.memory-flash ? 1100ms : 130ms; easing: ease-out; }
+
+    public function focus-link() { orb-link.focus(); }
+
+    stage := Rectangle {
+        y: 0px;
+        width: parent.width;
+        height: parent.height - 141px;
+        property <length> orb-size: min(self.width, min(self.height, 560px));
+
+        orb-image := Image {
+            width: stage.orb-size * root.activation-scale;
+            height: self.width;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            source: root.orb;
+            image-fit: contain;
+            opacity: root.memory-charging || root.memory-flash || root.thinking || root.voice-state == VoiceState.speaking || root.audio-state == AudioState.listening ? 1.0 : root.hovered ? 0.94 : 0.58;
+            animate opacity { duration: 180ms; }
+            accessible-role: none;
+        }
+
+        orb-link := FocusScope {
+            width: stage.orb-size * 0.68;
+            height: self.width;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            accessible-role: button;
+            accessible-label: "Open Memory Maps";
+            accessible-action-default => { root.open-memory(); }
+
+            key-released(event) => {
+                if (event.text == Key.Return || event.text == Key.Space) {
+                    root.open-memory();
+                    return accept;
+                }
+                return reject;
+            }
+
+            Rectangle {
+                visible: orb-link.has-focus;
+                border-radius: self.width / 2;
+                border-width: 1.5px;
+                border-color: #408c98;
+            }
+
+            orb-pointer := MemoryHoldArea {
+                inside: root.inside-orb;
+                mouse-cursor: root.inside-orb ? MouseCursor.pointer : MouseCursor.default;
+                hold-changed(holding) => { root.hold-memory(holding); }
+            }
+        }
+    }
+
+    Text {
+        y: stage.height;
+        width: parent.width;
+        height: 40px;
+        text: root.thinking ? "Thinking…"
+            : root.voice-state == VoiceState.connecting ? "Connecting…"
+            : root.voice-state == VoiceState.speaking ? "Amica is speaking"
+            : root.audio-state == AudioState.unavailable ? "Microphone unavailable"
+            : root.voice-state == VoiceState.failed ? "Voice unavailable"
+            : root.audio-state == AudioState.muted ? "Microphone muted"
+            : root.voice-state == VoiceState.listening ? "Live listening" : "Ready to talk";
+        font-size: root.width < 460px ? 27px : 33px;
+        font-weight: 600;
+        color: root.thinking ? #543484 : #142e3a;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    Text {
+        x: 8px;
+        y: stage.height + 43px;
+        width: parent.width - 16px;
+        height: root.voice-error == "" ? 28px : 34px;
+        text: root.audio-state == AudioState.unavailable ? root.audio-message
+            : root.voice-error != "" ? root.voice-error
+            : root.audio-state != AudioState.listening ? root.audio-message
+            : "Filipino, English, or Taglish";
+        font-size: root.voice-error == "" ? 13px : 12px;
+        color: root.voice-error == "" ? #536b74 : #952f42;
+        overflow: elide;
+        wrap: word-wrap;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    HorizontalLayout {
+        width: parent.width;
+        y: stage.height + 82px;
+        height: 48px;
+        spacing: 9px;
+        alignment: center;
+
+        MicButton {
+            state: root.audio-state;
+            clicked => { root.toggle-microphone(); }
+        }
+
+        if root.can-type: Button {
+            width: 133px;
+            text: "Type a message";
+            clicked => { root.open-chat(); }
+        }
+    }
+}

@@ -1,0 +1,87 @@
+import { Button, ScrollView } from "std-widgets.slint";
+
+export struct HardwareRow { label: string, value: string }
+
+export component HardwarePanel inherits Rectangle {
+    in property <[HardwareRow]> rows;
+    in property <bool> scanning;
+    in property <string> error;
+    callback scan;
+
+    background: #f7fbfb;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: #e0ebed;
+
+    Text {
+        x: 20px;
+        y: 17px;
+        text: "System specs";
+        font-size: 21px;
+        font-weight: 650;
+        color: #142e3a;
+    }
+
+    Button {
+        x: parent.width - self.width - 16px;
+        y: 13px;
+        text: root.scanning ? "Scanning…" : "Scan again";
+        enabled: !root.scanning;
+        clicked => { root.scan(); }
+    }
+
+    details := ScrollView {
+        x: 20px;
+        y: 58px;
+        width: parent.width - 38px;
+        height: parent.height - self.y - 16px;
+        content-width: self.visible-width;
+        content-height: max(self.visible-height, content.height);
+        horizontal-scrollbar-policy: always-off;
+        vertical-scrollbar-policy: as-needed;
+
+        content := VerticalLayout {
+            width: details.visible-width - 8px;
+            height: self.preferred-height;
+            spacing: 8px;
+
+            if root.error != "": Text {
+                text: root.error;
+                font-size: 13px;
+                color: #9a3e49;
+                wrap: word-wrap;
+            }
+
+            for row in root.rows: Rectangle {
+                border-radius: 9px;
+                border-width: 1px;
+                border-color: #e0ebed;
+                background: #ffffff;
+                height: entry.preferred-height + 18px;
+
+                entry := VerticalLayout {
+                    x: 12px;
+                    y: 9px;
+                    width: parent.width - 24px;
+                    height: self.preferred-height;
+                    spacing: 4px;
+
+                    Text {
+                        text: row.label;
+                        font-size: 11px;
+                        font-weight: 650;
+                        color: #4c6c78;
+                        wrap: word-wrap;
+                    }
+
+                    Text {
+                        text: row.value;
+                        font-size: 13px;
+                        color: #173441;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+    }
+}

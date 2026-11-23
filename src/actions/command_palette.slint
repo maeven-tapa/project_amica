@@ -1,0 +1,73 @@
+import { Button, LineEdit, ListView } from "std-widgets.slint";
+
+export struct PaletteRow { phrase: string, language: string, outcome: string }
+
+export component CommandPalette inherits Rectangle {
+    in property <[PaletteRow]> entries;
+    in property <bool> desktop-on;
+    in property <string> target;
+    in property <string> result;
+    callback execute(string);
+    callback search(string);
+    callback stop;
+    public function focus-input() { prompt.focus(); }
+
+    background: #f7fbfb;
+    border-radius: 22px;
+    border-color: #dfebed;
+    border-width: 1px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        Text { text: "Command palette"; color: #173944; font-size: 21px; font-weight: 650; }
+        HorizontalLayout {
+            spacing: 8px;
+            Button {
+                text: root.desktop-on ? "Stop Desktop Control" : "Start Desktop Control";
+                clicked => { if root.desktop-on { root.stop(); } else { root.execute("Start Desktop Control"); } }
+            }
+            Text { text: root.desktop-on ? "On" : "Off"; color: #536b74; vertical-alignment: center; }
+        }
+        Text {
+            text: root.target == "" ? "Bring an app forward or enter Switch to followed by its name." : "Target · " + root.target;
+            wrap: word-wrap;
+            color: #536b74;
+            font-size: 12px;
+        }
+        HorizontalLayout {
+            spacing: 7px;
+            prompt := LineEdit {
+                placeholder-text: "Enter a local command";
+                accessible-label: "Enter a local command";
+                accepted => { if self.text != "" { root.execute(self.text); self.text = ""; root.search(""); } }
+                edited(text) => { root.search(text); }
+            }
+            Button {
+                text: "Run";
+                enabled: prompt.text != "";
+                clicked => { root.execute(prompt.text); prompt.text = ""; root.search(""); }
+            }
+        }
+        if root.result != "": Text {
+            height: min(90px, self.preferred-height);
+            text: root.result;
+            color: #674694;
+            wrap: word-wrap;
+            overflow: elide;
+        }
+        Text { text: "Examples"; color: #173944; font-weight: 650; }
+        ListView {
+            vertical-stretch: 1;
+            for entry in root.entries: VerticalLayout {
+                padding-bottom: 7px;
+                spacing: 4px;
+                Button {
+                    text: entry.language + " · " + entry.phrase;
+                    clicked => { prompt.text = entry.phrase; prompt.focus(); }
+                }
+                Text { text: entry.outcome; color: #536b74; font-size: 11px; wrap: word-wrap; }
+            }
+        }
+    }
+}

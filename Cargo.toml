@@ -1,0 +1,42 @@
+[package]
+name = "amica"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aec3 = "0.4"
+base64 = "0.22"
+chrono = "0.4"
+cpal = "0.18.2"
+futures-util = { version = "0.3", features = ["sink"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+regex = "1"
+rusqlite = { version = "0.43", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+slint = { version = "1.19.0", default-features = false, features = ["std", "backend-winit", "renderer-software", "compat-1-2", "accessibility", "raw-window-handle-06"] }
+tokio = { version = "1", features = ["macros", "rt", "sync", "time"] }
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }
+raw-window-handle = "0.6"
+webview2-com = "0.39.1"
+wmi = { version = "0.18.4", default-features = false }
+windows = { version = "0.62", features = ["Media_Control", "Win32_Foundation", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Variant", "Win32_UI_Accessibility", "Win32_UI_Shell", "Win32_UI_Shell_Common"] }
+windows-sys = { version = "0.61", features = ["Win32_Devices_Display", "Win32_Graphics_Gdi", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Storage_Xps", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Diagnostics_Debug", "Win32_System_Memory", "Win32_System_Ole", "Win32_System_Power", "Win32_System_ProcessStatus", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Magnification", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+
+[build-dependencies]
+slint-build = "1.19.0"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package.amica]
+opt-level = 2
+
+[profile.dev.package.aec3]
+opt-level = 2
+
+[profile.dev.package.i-slint-renderer-software]
+opt-level = 2
