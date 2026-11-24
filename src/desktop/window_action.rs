@@ -135,9 +135,13 @@ impl PowerAction {
         {
             super::windows::power(self)
         }
-        #[cfg(not(windows))]
+        #[cfg(target_os = "linux")]
         {
-            Err("PC power commands are available on Windows.")
+            super::linux::power(self)
+        }
+        #[cfg(not(any(windows, target_os = "linux")))]
+        {
+            Err("PC power commands are unavailable on this platform.")
         }
     }
 }

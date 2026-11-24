@@ -18,6 +18,12 @@ slint = { version = "1.19.0", default-features = false, features = ["std", "back
 tokio = { version = "1", features = ["macros", "rt", "sync", "time"] }
 tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+cpal = { version = "0.18.2", features = ["pulseaudio"] }
+rustix = { version = "1", features = ["event", "fs"] }
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }
 raw-window-handle = "0.6"

@@ -4,6 +4,7 @@ export component DigitalClock inherits VerticalLayout {
     in property <string> date;
     in property <length> digit-size: 84px;
     in property <length> date-size: 17px;
+    in property <int> digit-weight: 430;
     in property <color> ink: #f8f9ff;
     in property <color> secondary: #c6cde3;
 
@@ -37,7 +38,7 @@ export component DigitalClock inherits VerticalLayout {
             font-family: "Segoe UI Variable Display";
             color: root.ink;
             font-size: root.digit-size;
-            font-weight: 430;
+            font-weight: root.digit-weight;
             vertical-alignment: center;
         }
 

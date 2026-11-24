@@ -1,33 +1,32 @@
-use std::{
-    cell::RefCell,
-    time::{Duration, Instant},
-};
+#[cfg(windows)]
+use std::cell::RefCell;
+use std::time::{Duration, Instant};
 
 use rusqlite::{Connection, params};
-use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
+use slint::{ComponentHandle, ModelRc, Timer, VecModel};
 
 use crate::{AmicaWindow, Panel, desktop, local_time::now_ms};
 use crate::{daily, memory, timers};
 
+#[cfg(any(windows, target_os = "linux"))]
+use super::command::FileAction;
+#[cfg(windows)]
+use super::command::{InputAction, WindowControl};
 use super::{
     catalog,
-    command::{
-        BrowserAction, Command, FileAction, InputAction, MediaAction, SystemAction, WindowControl,
-    },
+    command::{BrowserAction, Command, MediaAction, SystemAction},
 };
 
+#[cfg(windows)]
 #[derive(Default)]
 struct State {
-    #[cfg(windows)]
     recent: Option<desktop::TargetWindow>,
-    #[cfg(windows)]
     target: Option<desktop::TargetWindow>,
-    #[cfg(windows)]
     grid: Option<(desktop::TargetWindow, u8, u8, crate::GridOverlay)>,
-    #[cfg(windows)]
     marker: Option<crate::PointerMarker>,
 }
 
+#[cfg(windows)]
 thread_local! {
     static STATE: RefCell<State> = RefCell::default();
 }
@@ -95,17 +94,23 @@ pub fn connect(window: &AmicaWindow) -> Timer {
             window.set_palette_rows(ModelRc::new(VecModel::from(rows)));
         }
     });
-    let weak = window.as_weak();
     let timer = Timer::default();
-    timer.start(TimerMode::Repeated, Duration::from_millis(300), move || {
-        let Some(window) = weak.upgrade() else { return };
-        #[cfg(windows)]
-        if !window.get_saver_active()
-            && let Ok(front) = desktop::TargetWindow::find("current")
-        {
-            STATE.with_borrow_mut(|state| state.recent = Some(front));
-        }
-    });
+    #[cfg(windows)]
+    {
+        let weak = window.as_weak();
+        timer.start(
+            slint::TimerMode::Repeated,
+            Duration::from_millis(300),
+            move || {
+                let Some(window) = weak.upgrade() else { return };
+                if !window.get_saver_active()
+                    && let Ok(front) = desktop::TargetWindow::find("current")
+                {
+                    STATE.with_borrow_mut(|state| state.recent = Some(front));
+                }
+            },
+        );
+    }
     timer
 }
 
@@ -127,6 +132,29 @@ fn stop(window: &AmicaWindow) {
 }
 
 pub fn available(command: &Command) -> bool {
+    #[cfg(target_os = "linux")]
+    return match command {
+        Command::Input(..)
+        | Command::Window(..)
+        | Command::Clipboard(..)
+        | Command::CopyTitle(..)
+        | Command::Capture(..) => false,
+        Command::Files(action) => matches!(action, FileAction::OpenFolder(_)),
+        Command::Browser(action) => {
+            matches!(action, BrowserAction::Open(_) | BrowserAction::Search(_))
+        }
+        Command::System(action) => {
+            matches!(action, SystemAction::Volume(..) | SystemAction::Metric(_))
+        }
+        Command::Media(MediaAction::Rate(_)) => false,
+        Command::Routines(
+            super::command::RoutineAction::SaveLayout(_)
+            | super::command::RoutineAction::RestoreLayout(_),
+        ) => false,
+        Command::Launch(id) => desktop::linux::supports(id),
+        _ => true,
+    };
+    #[cfg(not(target_os = "linux"))]
     !matches!(command, Command::System(SystemAction::Output(..)))
 }
 
@@ -198,6 +226,11 @@ fn execute(window: &AmicaWindow, command: Command) -> Result<String, String> {
         }
         Command::DesktopMode(true) => {
             window.set_desktop_control(true);
+            #[cfg(target_os = "linux")]
+            return Ok(
+                "Desktop Control is on. Use the palette to find available Linux commands.".into(),
+            );
+            #[cfg(not(target_os = "linux"))]
             Ok("Desktop Control is on. Choose a target window or bring it forward.".into())
         }
         Command::DesktopMode(false) => {
@@ -391,9 +424,35 @@ fn media(window: &AmicaWindow, action: MediaAction) -> Result<String, String> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+fn platform(_: &AmicaWindow, command: Command) -> Result<String, String> {
+    match command {
+        Command::Files(FileAction::OpenFolder(folder)) => {
+            desktop::open_folder(&folder)?;
+            Ok("Opened the folder in the file manager.".into())
+        }
+        Command::Browser(BrowserAction::Open(url)) => {
+            desktop::open_browser_url(&url)?;
+            Ok("Opened the address in the default browser.".into())
+        }
+        Command::Browser(BrowserAction::Search(query)) => {
+            let mut url = reqwest::Url::parse("https://www.google.com/search").unwrap();
+            url.query_pairs_mut()
+                .append_pair("q", limited(&query, 500)?);
+            desktop::open_browser_url(url.as_str())?;
+            Ok("Opened a browser search for the requested query.".into())
+        }
+        Command::System(SystemAction::Metric(name)) => desktop::linux::metric(&name),
+        Command::System(SystemAction::Volume(amount, relative)) => {
+            desktop::linux::set_volume(amount, relative).map_err(str::to_owned)
+        }
+        _ => Err("This desktop action is unavailable on Linux.".into()),
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 fn platform(_: &AmicaWindow, _: Command) -> Result<String, String> {
-    Err("This desktop action is available on Windows.".into())
+    Err("This desktop action is unavailable on this platform.".into())
 }
 
 #[cfg(windows)]

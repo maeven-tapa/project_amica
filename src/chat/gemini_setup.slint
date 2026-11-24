@@ -1,0 +1,106 @@
+import { Button, LineEdit } from "std-widgets.slint";
+
+export component GeminiSetup inherits VerticalLayout {
+    in property <bool> configured;
+    in property <bool> from-environment;
+    in property <bool> can-save;
+    callback save-key(string) -> string;
+
+    property <bool> replacing;
+    property <string> error;
+
+    function submit-key(key: string) -> bool {
+        root.error = root.save-key(key);
+        if root.error != "" { return false; }
+        root.replacing = false;
+        return true;
+    }
+
+    spacing: 6px;
+
+    Text {
+        text: "Gemini API key";
+        font-size: 14px;
+        font-weight: 650;
+        color: #173944;
+    }
+
+    if root.from-environment: Text {
+        text: "Using the GEMINI_API_KEY environment variable.";
+        font-size: 12px;
+        color: #4f6974;
+        wrap: word-wrap;
+    }
+
+    if root.can-save && root.configured && !root.from-environment && !root.replacing: HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: "Saved in Windows Credential Manager.";
+            font-size: 12px;
+            color: #4f6974;
+            wrap: word-wrap;
+            vertical-alignment: center;
+        }
+        Button { text: "Replace key"; clicked => { root.replacing = true; } }
+    }
+
+    if !root.can-save && !root.from-environment: VerticalLayout {
+        spacing: 6px;
+        Text {
+            text: "Set GEMINI_API_KEY in the terminal, then relaunch Amica to enable chat and voice.";
+            font-size: 12px;
+            color: #4f6974;
+            wrap: word-wrap;
+        }
+        Button {
+            text: "Get an API key";
+            clicked => { Platform.open-url("https://aistudio.google.com/apikey"); }
+        }
+    }
+
+    if root.can-save && !root.from-environment && (!root.configured || root.replacing): VerticalLayout {
+        spacing: 6px;
+
+        Text {
+            text: "Use your Google AI Studio key to enable chat and voice. Amica saves it in Windows Credential Manager.";
+            font-size: 12px;
+            color: #4f6974;
+            wrap: word-wrap;
+        }
+
+        key-input := LineEdit {
+            input-type: password;
+            placeholder-text: "Paste your Gemini API key";
+            accessible-label: "Gemini API key";
+            accepted(key) => { if root.submit-key(key) { self.text = ""; } }
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+            Button {
+                text: "Save key";
+                enabled: key-input.text != "";
+                clicked => { if root.submit-key(key-input.text) { key-input.text = ""; } }
+            }
+            Button {
+                text: "Get an API key";
+                clicked => { Platform.open-url("https://aistudio.google.com/apikey"); }
+            }
+            if root.replacing: Button {
+                text: "Cancel";
+                clicked => {
+                    key-input.text = "";
+                    root.error = "";
+                    root.replacing = false;
+                }
+            }
+        }
+
+        if root.error != "": Text {
+            text: root.error;
+            color: #983d49;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+}

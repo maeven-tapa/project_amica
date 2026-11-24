@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(windows)]
 mod playback;
 mod request;
@@ -5,6 +7,8 @@ mod request;
 mod source;
 #[cfg(windows)]
 mod system;
+#[cfg(target_os = "linux")]
+use linux as system;
 #[cfg(windows)]
 mod webview;
 
@@ -13,7 +17,12 @@ use crate::{AmicaWindow, Panel, actions::command::MediaAction};
 pub use request::{PlayRequest, Service, spoken_request};
 
 pub fn panel_for(id: &str) -> Option<Panel> {
-    Some(Service::parse(id)?.panel())
+    #[cfg(windows)]
+    return Some(Service::parse(id)?.panel());
+    #[cfg(not(windows))]
+    let _ = id;
+    #[cfg(not(windows))]
+    None
 }
 
 pub fn initialize(db: &rusqlite::Connection) -> rusqlite::Result<()> {
@@ -41,7 +50,7 @@ pub fn local_command(_: &AmicaWindow, action: MediaAction) -> Result<String, Str
     run(action)
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 fn schedule_pause(seconds: u32) -> Result<String, String> {
     if !(1..=86_400).contains(&seconds) {
         return Err("Choose a pause time within the next day.".into());
@@ -62,20 +71,20 @@ fn schedule_pause(seconds: u32) -> Result<String, String> {
     ))
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn schedule_pause(_: u32) -> Result<String, String> {
     Err("Scheduled media controls are available on Windows.".into())
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 fn run(action: MediaAction) -> Result<String, String> {
     std::thread::spawn(move || system::run(action))
         .join()
-        .map_err(|_| "The Windows media provider stopped.")?
+        .map_err(|_| "The media provider stopped.")?
         .map_err(str::to_owned)
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn run(_: MediaAction) -> Result<String, String> {
     Err("System media controls are available on Windows.".into())
 }
@@ -85,7 +94,11 @@ pub fn connect(window: &AmicaWindow) -> slint::Timer {
     {
         webview::connect(window)
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
+    {
+        linux::connect(window)
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         use slint::ComponentHandle;
 

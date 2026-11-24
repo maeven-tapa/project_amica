@@ -298,7 +298,12 @@ pub fn command(window: &AmicaWindow, action: RoutineAction) -> Result<String, St
             #[cfg(not(windows))]
             let steps: Vec<Step> = Vec::new();
             if steps.is_empty() {
-                return Err("No supported app windows are open to save.".into());
+                return Err(if cfg!(windows) {
+                    "No supported app windows are open to save."
+                } else {
+                    "Saving window layouts is unavailable on this platform."
+                }
+                .into());
             }
             desktop::confirm(
                 window,
@@ -493,12 +498,7 @@ fn execute(window: &AmicaWindow, step: &Step) -> Result<(), String> {
                 desktop::open_app(app)?;
             }
         }
-        Step::Folder(folder) => {
-            #[cfg(windows)]
-            desktop::windows::open_path(&desktop::files::known_folder(folder)?)?;
-            #[cfg(not(windows))]
-            return Err(format!("Windows folders are unavailable: {folder}."));
-        }
+        Step::Folder(folder) => desktop::open_folder(folder)?,
         Step::Timer(seconds, label) => {
             let db = crate::actions::open().map_err(|_| DB_ERROR)?;
             crate::timers::start(&db, i64::from(*seconds), label, now_ms())?;
@@ -511,13 +511,15 @@ fn execute(window: &AmicaWindow, step: &Step) -> Result<(), String> {
         }
         Step::SaveLayout(name) => {
             #[cfg(windows)]
-            let steps: Vec<_> = desktop::layout::snapshot()
-                .into_iter()
-                .map(Step::Layout)
-                .collect();
+            {
+                let steps: Vec<_> = desktop::layout::snapshot()
+                    .into_iter()
+                    .map(Step::Layout)
+                    .collect();
+                save(&db()?, name, &steps)?;
+            }
             #[cfg(not(windows))]
-            let steps: Vec<Step> = Vec::new();
-            save(&db()?, name, &steps)?;
+            return Err(format!("Saving window layouts is unavailable: {name}."));
         }
         Step::ShowTasks => window.invoke_show_panel(Panel::Daily),
         Step::Layout(saved) => {

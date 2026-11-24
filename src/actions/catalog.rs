@@ -466,7 +466,7 @@ const RULES: &[Rule] = &[
         |m| Some(Command::CopyTitle(first(m)?.into())),
     ),
     (
-        r"^(?:set (?:windows volume|mo ang volume) to|itakda ang lakas ng tunog sa) (\d+)%$",
+        r"^(?:set (?:(?:the )?(?:windows )?volume|mo ang volume) to|itakda ang lakas ng tunog sa) (\d+)%$",
         |m| {
             Some(Command::System(SystemAction::Volume(
                 m[1].parse().ok()?,
@@ -475,7 +475,7 @@ const RULES: &[Rule] = &[
         },
     ),
     (
-        r"^(?:adjust (?:mo ang )?windows volume (up|down) (\d+) percentage points|baguhin ang lakas ng tunog nang (\d+) puntos (pataas|pababa))$",
+        r"^(?:adjust (?:(?:the|mo ang) )?(?:windows )?volume (up|down) (\d+) percentage points|baguhin ang lakas ng tunog nang (\d+) puntos (pataas|pababa))$",
         |m| {
             let direction = Direction::parse(part(m, 1).or_else(|| part(m, 4))?)?;
             let percent: i32 = part(m, 2).or_else(|| part(m, 3))?.parse().ok()?;

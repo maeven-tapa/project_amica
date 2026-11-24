@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod actions;
 mod app;
@@ -58,11 +58,12 @@ fn show_unavailable(window: &AmicaWindow, message: &str) {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().nth(1).as_deref() == Some("--set-gemini-key") {
         chat::store_from_stdin()?;
-        println!("Gemini API key saved in Windows Credential Manager.");
+        println!("Gemini API key saved in the system credential store.");
         return Ok(());
     }
 
     let window = AmicaWindow::new()?;
+    window.set_linux_desktop(cfg!(target_os = "linux"));
     usage::start();
     app::connect(&window);
     desktop::connect(&window);
@@ -81,6 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let orb = Orb::new();
     let mut pointer = PointerMotion::default();
     window.set_orb(orb.frame(0.0, 0.0, false, pointer));
+    window.set_dashboard_orb(orb.dashboard_frame());
 
     window.set_device_name("Microphone off".into());
     window.set_audio_message("Talk to start voice conversation.".into());

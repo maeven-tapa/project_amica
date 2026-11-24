@@ -39,6 +39,7 @@ export component Screensaver inherits FocusScope {
     in property <string> preset: "Dashboard";
     in property <bool> dimmed;
     in property <image> orb;
+    in property <image> dashboard-orb;
     in property <string> clock;
     in property <string> period;
     in property <string> date;
@@ -68,18 +69,17 @@ export component Screensaver inherits FocusScope {
 
     if root.preset == "Black Clock": Rectangle { background: black; }
 
-    if root.preset != "Black Clock": Backdrop {
+    if root.preset == "Ambient": Backdrop {
         tint: root.tint;
         drift: root.drift;
     }
 
     if root.preset == "Dashboard": SaverDashboard {
-        x: (parent.width - self.width) / 2 + root.drift * 5px;
-        y: (parent.height - self.height) / 2 + root.drift * 4px;
-        width: min(920px, parent.width - 64px);
-        height: min(640px, parent.height - 64px);
+        width: parent.width;
+        height: parent.height;
         drift: root.drift;
-        orb: root.orb;
+        orb: root.dashboard-orb;
+        tint: root.tint;
         clock: root.clock;
         period: root.period;
         date: root.date;

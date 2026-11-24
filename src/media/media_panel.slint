@@ -3,6 +3,7 @@ import { Button } from "std-widgets.slint";
 export component MediaPanel inherits Rectangle {
     in property <string> service;
     in property <string> error;
+    in property <bool> embedded;
     in property <bool> audio-available;
     in property <bool> playing;
     in property <bool> muted;
@@ -47,14 +48,15 @@ export component MediaPanel inherits Rectangle {
         y: 10px;
         height: 32px;
         text: "Reload";
+        visible: root.embedded;
         clicked => { root.reload(); }
     }
 
     external-button := Button {
-        x: reload-button.x - self.width - 8px;
+        x: root.embedded ? reload-button.x - self.width - 8px : parent.width - self.width - 13px;
         y: reload-button.y;
         height: reload-button.height;
-        text: "Open externally";
+        text: root.embedded ? "Open externally" : "Open in browser";
         clicked => { root.open-external(); }
     }
 
@@ -87,7 +89,7 @@ export component MediaPanel inherits Rectangle {
             width: parent.width - 40px;
             text: root.error == "" ? "Opening " + root.service + "…" : root.error;
             font-size: 13px;
-            color: root.error == "" ? #4b6672 : #963a45;
+            color: root.error == "" || !root.embedded ? #4b6672 : #963a45;
             horizontal-alignment: center;
             vertical-alignment: center;
             wrap: word-wrap;

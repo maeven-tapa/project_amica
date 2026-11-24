@@ -133,6 +133,7 @@ struct Session {
 
 pub fn connect(window: &AmicaWindow) {
     window.set_gemini_model(gemini::MODEL_NAME.into());
+    credentials::connect_setup(window);
     let Ok(history) = History::open() else {
         window.set_chat_error(HISTORY_ERROR.into());
         return;

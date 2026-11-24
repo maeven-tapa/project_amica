@@ -11,6 +11,7 @@ const GOLDEN_ANGLE: f32 = 2.399_963_1;
 type Color = [u8; 3];
 
 struct Palette {
+    framed: bool,
     halo: Color,
     body_light: Color,
     body_dark: Color,
@@ -22,6 +23,7 @@ struct Palette {
 }
 
 const TEAL: Palette = Palette {
+    framed: true,
     halo: [161, 215, 221],
     body_light: [236, 254, 249],
     body_dark: [78, 172, 187],
@@ -33,6 +35,7 @@ const TEAL: Palette = Palette {
 };
 
 const PURPLE: Palette = Palette {
+    framed: true,
     halo: [200, 163, 236],
     body_light: [247, 236, 255],
     body_dark: [144, 77, 204],
@@ -41,6 +44,17 @@ const PURPLE: Palette = Palette {
     particle_dark: [[68, 30, 119], [101, 44, 151]],
     particle_light: [[154, 85, 217], [235, 192, 255]],
     band: [171, 100, 227],
+};
+
+const DASHBOARD: Palette = Palette {
+    framed: false,
+    halo: [44, 211, 202],
+    body_light: [151, 226, 216],
+    body_dark: [17, 97, 105],
+    particle_dark: [[94, 205, 189], [129, 234, 219]],
+    particle_light: [[184, 255, 237], [246, 255, 246]],
+    band: [113, 237, 222],
+    ..TEAL
 };
 
 struct Particle {
@@ -115,7 +129,27 @@ impl Orb {
         } else {
             (&self.teal_backdrop, &TEAL)
         };
-        let mut buffer = backdrop.clone();
+        self.render(backdrop.clone(), palette, time, level, pointer)
+    }
+
+    pub fn dashboard_frame(&self) -> Image {
+        self.render(
+            make_backdrop(&DASHBOARD),
+            &DASHBOARD,
+            0.0,
+            0.0,
+            PointerMotion::default(),
+        )
+    }
+
+    fn render(
+        &self,
+        mut buffer: SharedPixelBuffer<Rgba8Pixel>,
+        palette: &Palette,
+        time: f32,
+        level: f32,
+        pointer: PointerMotion,
+    ) -> Image {
         let pixels = buffer.make_mut_slice();
         let (sin, cos) = (time * 0.20 + 0.35 + pointer.x * pointer.strength * 0.40).sin_cos();
         let (tilt_sin, tilt_cos) = (-0.34 - pointer.y * pointer.strength * 0.25).sin_cos();
@@ -199,9 +233,13 @@ fn make_backdrop(palette: &Palette) -> SharedPixelBuffer<Rgba8Pixel> {
         let rim = distance / RADIUS;
 
         let halo = (-distance * distance / 39_000.0).exp() * 0.18;
-        let shadow_y = (y - 233.0) * 5.5;
-        let shadow = (-(x * x + shadow_y * shadow_y) / 8_000.0).exp() * 0.22;
         let mut color = Rgba8Pixel::default();
+        let shadow = if palette.framed {
+            let shadow_y = (y - 233.0) * 5.5;
+            (-(x * x + shadow_y * shadow_y) / 8_000.0).exp() * 0.22
+        } else {
+            0.0
+        };
         composite(&mut color, palette.halo, halo + shadow);
 
         let light = smoothstep(-0.9, 1.1, (x * 0.53 + y * 0.70) / RADIUS);
@@ -212,6 +250,11 @@ fn make_backdrop(palette: &Palette) -> SharedPixelBuffer<Rgba8Pixel> {
             light * 0.61 + at_edge * 0.23,
         );
         composite(&mut color, body, 1.0 - smoothstep(0.92, 1.064, rim));
+
+        if !palette.framed {
+            *pixel = color;
+            continue;
+        }
 
         let inner_ring = 1.0 - smoothstep(0.1, 1.3, (distance - 240.0).abs());
         let outer_ring = 1.0 - smoothstep(0.1, 1.4, (distance - 285.0).abs());
@@ -238,9 +281,11 @@ fn make_backdrop(palette: &Palette) -> SharedPixelBuffer<Rgba8Pixel> {
         *pixel = color;
     }
 
-    let pixels = buffer.make_mut_slice();
-    for (x, y) in [(-285.0, 0.0), (285.0, 0.0), (0.0, -285.0), (0.0, 285.0)] {
-        spot(pixels, CENTER + x, CENTER + y, 2.6, palette.marker, 0.75);
+    if palette.framed {
+        let pixels = buffer.make_mut_slice();
+        for (x, y) in [(-285.0, 0.0), (285.0, 0.0), (0.0, -285.0), (0.0, 285.0)] {
+            spot(pixels, CENTER + x, CENTER + y, 2.6, palette.marker, 0.75);
+        }
     }
     buffer
 }

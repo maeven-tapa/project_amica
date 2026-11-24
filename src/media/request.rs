@@ -1,3 +1,4 @@
+#[cfg(windows)]
 use crate::Panel;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,6 +30,7 @@ impl Service {
         }
     }
 
+    #[cfg(windows)]
     pub fn panel(self) -> Panel {
         match self {
             Self::YouTube => Panel::Youtube,
@@ -42,6 +44,42 @@ impl Service {
             Self::YouTube => 0,
             Self::Spotify => 1,
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub(super) fn browser_page(self, query: &str) -> reqwest::Url {
+        if let Ok(url) = reqwest::Url::parse(query)
+            && url.scheme() == "https"
+            && url.username().is_empty()
+            && url.password().is_none()
+            && match self {
+                Self::YouTube => matches!(
+                    url.host_str(),
+                    Some("www.youtube.com" | "youtube.com" | "m.youtube.com" | "youtu.be")
+                ),
+                Self::Spotify => url.host_str() == Some("open.spotify.com"),
+            }
+        {
+            return url;
+        }
+        let mut url = reqwest::Url::parse(match self {
+            Self::YouTube if query.is_empty() => "https://www.youtube.com/",
+            Self::YouTube => "https://www.youtube.com/results",
+            Self::Spotify if query.is_empty() => "https://open.spotify.com/",
+            Self::Spotify => "https://open.spotify.com/search/",
+        })
+        .unwrap();
+        if !query.is_empty() {
+            match self {
+                Self::YouTube => {
+                    url.query_pairs_mut().append_pair("search_query", query);
+                }
+                Self::Spotify => {
+                    url.path_segments_mut().unwrap().pop_if_empty().push(query);
+                }
+            }
+        }
+        url
     }
 }
 

@@ -79,11 +79,11 @@ fn run(window: Weak<AmicaWindow>, commands: mpsc::Receiver<i64>) {
             error = "Amica could not open local storage.";
         }
 
-        if !finished.is_empty() || !due.is_empty() {
-            timers::notify_finished();
-        }
         let finished = finished.join(", ");
         let due = due.join(", ");
+        if !finished.is_empty() || !due.is_empty() {
+            timers::notify_finished(&finished, &due);
+        }
         if window
             .upgrade_in_event_loop(move |window| {
                 if window.get_local_error() != error {

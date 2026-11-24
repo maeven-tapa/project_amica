@@ -21,6 +21,7 @@ impl Direction {
         })
     }
 
+    #[cfg(windows)]
     pub fn offset(self, pixels: i32) -> (i32, i32) {
         match self {
             Self::Left => (-pixels, 0),

@@ -26,14 +26,15 @@ export struct PanelItem { panel: Panel, label: string }
 export component AmicaWindow inherits Window {
     title: "Amica";
     icon: @image-url("../brand/amica.svg");
-    preferred-width: 1152px;
-    preferred-height: 760px;
+    preferred-width: root.linux-desktop ? 1024px : 1152px;
+    preferred-height: root.linux-desktop ? 640px : 760px;
     min-width: 510px;
-    min-height: 600px;
+    min-height: root.linux-desktop ? 420px : 600px;
     background: #ffffff;
     always-on-top: root.saver-active;
-    default-font-family: "Segoe UI";
+    default-font-family: root.linux-desktop ? "DejaVu Sans" : "Segoe UI";
     in property <image> orb;
+    in property <image> dashboard-orb;
     out property <bool> orb-hovered: orb-panel.hovered && !root.memory-open;
     out property <float> orb-pointer-x: orb-panel.pointer-x;
     out property <float> orb-pointer-y: orb-panel.pointer-y;
@@ -62,6 +63,12 @@ export component AmicaWindow inherits Window {
     callback search-conversations(string);
     callback reload-conversation;
     callback conversation-setting(string, string);
+    in property <bool> gemini-setup-available;
+    in property <bool> gemini-key-can-save;
+    in property <bool> linux-desktop;
+    in property <bool> gemini-key-configured;
+    in property <bool> gemini-key-from-environment;
+    callback save-gemini-key(string) -> string;
     callback send-chat;
     in property <VoiceState> voice-state;
     in property <string> voice-model;
@@ -84,6 +91,7 @@ export component AmicaWindow inherits Window {
     in property <bool> saver-dimmed;
     in property <bool> saver-dim-on-battery;
     in property <int> saver-idle-seconds;
+    in property <bool> saver-idle-available: true;
     in property <string> saver-idle-label: "Off";
     in property <string> saver-preset: "Dashboard";
     in property <string> saver-palette: "Indigo";
@@ -166,6 +174,7 @@ export component AmicaWindow inherits Window {
     callback launch-app(string);
     in property <string> desktop-error;
     in property <string> media-error;
+    in property <bool> media-embedded: true;
     in property <bool> media-audio-available;
     in property <bool> media-playing;
     in property <bool> media-muted;
@@ -524,6 +533,7 @@ export component AmicaWindow inherits Window {
             }
 
             AppsPanel {
+                linux-desktop: root.linux-desktop;
                 x: chat.x;
                 y: 0px;
                 width: chat.width;
@@ -569,9 +579,14 @@ export component AmicaWindow inherits Window {
                 memory-capture: root.memory-capture;
                 memory-error: root.memory-error;
                 saver-idle: root.saver-idle-label;
+                saver-idle-available: root.saver-idle-available;
                 saver-preset: root.saver-preset;
                 saver-palette: root.saver-palette;
                 saver-dim: root.saver-dim-on-battery;
+                gemini-setup-available: root.gemini-setup-available;
+                gemini-key-can-save: root.gemini-key-can-save;
+                gemini-key-configured: root.gemini-key-configured;
+                gemini-key-from-environment: root.gemini-key-from-environment;
                 error: root.settings-error;
                 refresh => { root.refresh-settings(); }
                 select-device(input, device) => { root.select-audio-device(input, device); }
@@ -580,6 +595,7 @@ export component AmicaWindow inherits Window {
                 configure-memory(enabled, clear) => { root.configure-memory(enabled, clear); }
                 saver-setting(key, value) => { root.save-saver-setting(key, value); }
                 preview-saver => { root.enter-saver(""); }
+                save-gemini-key(key) => { return root.save-gemini-key(key); }
             }
 
             palette := CommandPalette {
@@ -626,6 +642,7 @@ export component AmicaWindow inherits Window {
                 visible: root.media-active;
                 service: root.active-panel == Panel.youtube ? "YouTube" : "Spotify";
                 error: root.media-error;
+                embedded: root.media-embedded;
                 audio-available: root.media-audio-available;
                 playing: root.media-playing;
                 muted: root.media-muted;
@@ -707,6 +724,7 @@ export component AmicaWindow inherits Window {
             preset: root.active-saver-preset;
             dimmed: root.saver-dimmed;
             orb: root.orb;
+            dashboard-orb: root.dashboard-orb;
             clock: root.saver-clock;
             period: root.saver-period;
             date: root.saver-date;

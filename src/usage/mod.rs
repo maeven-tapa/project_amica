@@ -1,5 +1,11 @@
+#[cfg(target_os = "linux")]
+#[path = "linux.rs"]
+mod platform;
 #[cfg(windows)]
-mod windows;
+#[path = "windows.rs"]
+mod platform;
+#[cfg(any(windows, target_os = "linux"))]
+mod sample;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -51,18 +57,38 @@ pub fn read_json(response: Response) -> Option<Value> {
 }
 
 pub fn start() {
-    #[cfg(windows)]
-    windows::start();
+    #[cfg(any(windows, target_os = "linux"))]
+    sample::start();
 }
 
 pub fn read(scope: Scope) -> Result<Value, &'static str> {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     {
-        windows::read(scope)
+        sample::read(scope)
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         let _ = scope;
-        Err("Live system usage is available on Windows.")
+        Err("Live system usage is unavailable on this platform.")
     }
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) use platform::physical_memory;
+
+pub(crate) fn metric(name: &str) -> Result<String, String> {
+    let (label, key, unit) = match name {
+        "cpu usage" | "gamit ng cpu" => ("CPU usage", "cpu_percent_of_pc_capacity", "%"),
+        "memory usage" | "ram usage" | "gamit ng memory" => {
+            ("RAM usage", "memory_percent_of_pc_ram", "%")
+        }
+        "download rate" | "bilis ng download" => ("Download rate", "download_mbps", " Mbps"),
+        "upload rate" | "bilis ng upload" => ("Upload rate", "upload_mbps", " Mbps"),
+        _ => return Err("The requested metric is unavailable.".into()),
+    };
+    let report = read(Scope::Computer)?;
+    let value = report[key]
+        .as_f64()
+        .ok_or("That measurement is unavailable.")?;
+    Ok(format!("{label}: {value:.1}{unit}."))
 }

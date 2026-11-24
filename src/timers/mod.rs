@@ -91,13 +91,37 @@ pub fn take_finished(connection: &Connection, now: i64) -> rusqlite::Result<Vec<
     update.query_map([now], |row| row.get(0))?.collect()
 }
 
-pub fn notify_finished() {
+pub fn notify_finished(finished: &str, due: &str) {
     #[cfg(windows)]
     unsafe {
         windows_sys::Win32::System::Diagnostics::Debug::MessageBeep(
             windows_sys::Win32::UI::WindowsAndMessaging::MB_OK,
         );
     }
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::{Command, Stdio};
+
+        let mut lines = Vec::new();
+        if !finished.is_empty() {
+            lines.push(format!("Timer finished: {finished}"));
+        }
+        if !due.is_empty() {
+            lines.push(format!("Reminder: {due}"));
+        }
+        let body = lines
+            .join("\n")
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;");
+        let _ = Command::new("notify-send")
+            .args(["--app-name=Amica", "--", "Amica", &body])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = (finished, due);
 }
 
 #[cfg(test)]

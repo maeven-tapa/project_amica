@@ -14,6 +14,8 @@ pub(crate) mod files;
 pub(crate) mod input;
 #[cfg(windows)]
 pub(crate) mod layout;
+#[cfg(target_os = "linux")]
+pub(crate) mod linux;
 #[cfg(windows)]
 pub(crate) mod system;
 mod window_action;
@@ -58,9 +60,9 @@ pub fn connect(window: &AmicaWindow) {
     });
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 pub fn open_media_page(window: &AmicaWindow, url: String) {
-    launch(window, move || windows::open_page(&url));
+    launch(window, move || open_page(&url));
 }
 
 fn launch(
@@ -94,18 +96,47 @@ fn launch(
 
 pub fn open_search_results(window: &AmicaWindow, query: String) {
     launch(window, move || {
-        #[cfg(windows)]
-        {
-            let mut page = reqwest::Url::parse("https://www.google.com/search").unwrap();
-            page.query_pairs_mut().append_pair("q", &query);
-            windows::open_page(page.as_str())
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = query;
-            Err("Opening search results is available on Windows.")
-        }
+        let mut page = reqwest::Url::parse("https://www.google.com/search").unwrap();
+        page.query_pairs_mut().append_pair("q", &query);
+        open_page(page.as_str())
     });
+}
+
+fn open_page(url: &str) -> Result<(), &'static str> {
+    #[cfg(windows)]
+    return windows::open_page(url);
+    #[cfg(target_os = "linux")]
+    return linux::open_page(url);
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        let _ = url;
+        Err("Opening web pages is unavailable on this platform.")
+    }
+}
+
+pub fn open_folder(folder: &str) -> Result<(), &'static str> {
+    #[cfg(windows)]
+    return windows::open_path(&files::known_folder(folder)?);
+    #[cfg(target_os = "linux")]
+    return linux::open_folder(folder);
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        let _ = folder;
+        Err("Opening folders is unavailable on this platform.")
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn open_browser_url(url: &str) -> Result<(), &'static str> {
+    let url = reqwest::Url::parse(url).map_err(|_| "Enter a valid HTTPS address.")?;
+    if url.scheme() != "https"
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err("Use an HTTPS address without credentials.");
+    }
+    open_page(url.as_str())
 }
 
 pub fn open_app(id: &str) -> Result<(), &'static str> {
@@ -117,9 +148,13 @@ pub fn open_app(id: &str) -> Result<(), &'static str> {
     {
         windows::open(id)
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
     {
-        Err("Amica’s app launcher is available on Windows.")
+        linux::open(id)
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        Err("Amica’s app launcher is unavailable on this platform.")
     }
 }
 

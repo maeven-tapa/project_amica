@@ -237,7 +237,7 @@ mod tests {
     use super::*;
     use crate::{Panel, microphone::pcm::Resampler, voice::playback::REPLY_RATE};
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     #[tokio::test]
     #[ignore = "Requires a Gemini API key and uses the Live API"]
     async fn system_usage_requests_choose_the_pc_or_amica() {

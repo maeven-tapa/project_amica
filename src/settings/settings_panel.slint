@@ -1,4 +1,5 @@
 import { Button, CheckBox, ComboBox, ScrollView } from "std-widgets.slint";
+import { GeminiSetup } from "../chat/gemini_setup.slint";
 
 component AudioPicker inherits VerticalLayout {
     in property <string> label;
@@ -47,7 +48,12 @@ export component SettingsPanel inherits Rectangle {
     in property <string> saver-preset;
     in property <string> saver-palette;
     in property <string> saver-idle;
+    in property <bool> saver-idle-available;
     in property <bool> saver-dim;
+    in property <bool> gemini-setup-available;
+    in property <bool> gemini-key-can-save;
+    in property <bool> gemini-key-configured;
+    in property <bool> gemini-key-from-environment;
     property <bool> confirm-clear;
     in property <string> error;
     callback refresh;
@@ -57,6 +63,7 @@ export component SettingsPanel inherits Rectangle {
     callback configure-memory(bool, bool);
     callback saver-setting(string, string);
     callback preview-saver;
+    callback save-gemini-key(string) -> string;
 
     background: #f7fbfb;
     border-width: 1px;
@@ -94,6 +101,13 @@ export component SettingsPanel inherits Rectangle {
             width: scroll.visible-width - 14px;
             height: self.preferred-height;
             spacing: 16px;
+
+            if root.visible && root.gemini-setup-available: GeminiSetup {
+                can-save: root.gemini-key-can-save;
+                configured: root.gemini-key-configured;
+                from-environment: root.gemini-key-from-environment;
+                save-key(key) => { return root.save-gemini-key(key); }
+            }
 
             AudioPicker {
                 label: "Microphone";
@@ -179,7 +193,7 @@ export component SettingsPanel inherits Rectangle {
                     }
                     Button { text: "Preview"; clicked => { root.preview-saver(); } }
                 }
-                ComboBox {
+                if root.saver-idle-available: ComboBox {
                     model: ["Off", "30 seconds", "1 minute", "2 minutes", "3 minutes", "5 minutes", "10 minutes", "15 minutes", "20 minutes", "30 minutes", "60 minutes"];
                     current-value: root.saver-idle;
                     accessible-label: "Inactivity before screensaver";
@@ -189,6 +203,12 @@ export component SettingsPanel inherits Rectangle {
                             value == "15 minutes" ? "900" : value == "20 minutes" ? "1200" : value == "30 minutes" ? "1800" :
                             value == "60 minutes" ? "3600" : "0");
                     }
+                }
+                if !root.saver-idle-available: Text {
+                    text: "Automatic start is unavailable in this desktop session.";
+                    font-size: 12px;
+                    color: #4f6974;
+                    wrap: word-wrap;
                 }
                 ComboBox {
                     model: ["Indigo", "Lavender", "Midnight", "Dawn", "Dusk", "Ocean", "Sampaguita", "Forest", "Ember", "Monochrome"];

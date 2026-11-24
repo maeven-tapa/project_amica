@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(windows)]
 mod windows;
 
@@ -17,9 +19,13 @@ pub fn scan() -> Result<Vec<Spec>, &'static str> {
     {
         windows::scan()
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
     {
-        Err("System specs scanning is available on Windows.")
+        linux::scan()
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        Err("System specs scanning is unavailable on this platform.")
     }
 }
 

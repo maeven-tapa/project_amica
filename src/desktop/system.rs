@@ -164,24 +164,7 @@ fn metric(name: &str) -> Result<String, String> {
                 available as f64 / 1_073_741_824.0
             ))
         }
-        metric => {
-            let (label, key, unit) = match metric {
-                "cpu usage" | "gamit ng cpu" => ("CPU usage", "cpu_percent_of_pc_capacity", "%"),
-                "memory usage" | "ram usage" | "gamit ng memory" => {
-                    ("RAM usage", "memory_percent_of_pc_ram", "%")
-                }
-                "download rate" | "bilis ng download" => {
-                    ("Download rate", "download_mbps", " Mbps")
-                }
-                "upload rate" | "bilis ng upload" => ("Upload rate", "upload_mbps", " Mbps"),
-                _ => return Err("The requested metric is unavailable.".into()),
-            };
-            let report = crate::usage::read(crate::usage::Scope::Computer)?;
-            let value = report[key]
-                .as_f64()
-                .ok_or("Windows did not return that measurement yet.")?;
-            Ok(format!("{label}: {value:.1}{unit}."))
-        }
+        metric => crate::usage::metric(metric),
     }
 }
 

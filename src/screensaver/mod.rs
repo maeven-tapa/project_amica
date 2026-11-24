@@ -8,6 +8,8 @@ use slint::{Color, ComponentHandle, Timer, TimerMode};
 
 use crate::{AmicaWindow, AudioState, memory::RippleBorder, settings, storage};
 
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(windows)]
 mod windows;
 
@@ -34,6 +36,14 @@ const PALETTES: &[(&str, (u8, u8, u8))] = &[
 ];
 
 pub fn connect(window: &AmicaWindow) -> Timer {
+    #[cfg(target_os = "linux")]
+    let mut idle = linux::Idle::connect();
+    #[cfg(target_os = "linux")]
+    window.set_saver_idle_available(idle.is_some());
+    #[cfg(not(any(windows, target_os = "linux")))]
+    window.set_saver_idle_available(false);
+    #[cfg(target_os = "linux")]
+    let last_activity = Rc::new(Cell::new(None));
     let db = storage::open()
         .ok()
         .filter(|db| settings::initialize(db).is_ok())
@@ -75,13 +85,18 @@ pub fn connect(window: &AmicaWindow) -> Timer {
 
     let weak = window.as_weak();
     let entering = Rc::clone(&active);
+    #[cfg(target_os = "linux")]
+    let entering_activity = Rc::clone(&last_activity);
     window.on_enter_saver(move |preset| {
         let Some(window) = weak.upgrade() else { return };
         if entering.borrow().is_some() || !window.get_power_request().is_empty() {
             return;
         }
         let root = window.window();
+        #[cfg(not(target_os = "linux"))]
         let input = last_input().map(|(stamp, _)| stamp);
+        #[cfg(target_os = "linux")]
+        let input = entering_activity.get();
         *entering.borrow_mut() = Some(Active {
             fullscreen: root.is_fullscreen(),
             was_minimized: root.is_minimized(),
@@ -136,7 +151,19 @@ pub fn connect(window: &AmicaWindow) -> Timer {
     let mut static_size = None;
     timer.start(TimerMode::Repeated, Duration::from_millis(160), move || {
         let Some(window) = weak.upgrade() else { return };
+        let timeout = window.get_saver_idle_seconds();
+        let timeout_ms = (timeout as u32).saturating_mul(1000);
+        #[cfg(not(target_os = "linux"))]
         let current = last_input();
+        #[cfg(target_os = "linux")]
+        let current = idle.as_mut().and_then(|idle| idle.poll(timeout_ms));
+        #[cfg(target_os = "linux")]
+        {
+            last_activity.set(current.map(|(stamp, _)| stamp));
+            if current.is_none() && idle.take().is_some() {
+                window.set_saver_idle_available(false);
+            }
+        }
         let previous = *active.borrow();
         if let Some(previous) = previous {
             if previous.entered.elapsed() > Duration::from_millis(210)
@@ -170,10 +197,9 @@ pub fn connect(window: &AmicaWindow) -> Timer {
             return;
         }
         static_size = None;
-        let timeout = window.get_saver_idle_seconds();
         if timeout > 0
             && Instant::now() >= idle_after.get()
-            && current.is_some_and(|(_, idle)| idle >= (timeout as u32).saturating_mul(1000))
+            && current.is_some_and(|(_, idle)| idle >= timeout_ms)
             && window.get_audio_state() != AudioState::Listening
             && !window.get_media_fullscreen()
             && !window.get_thinking()
@@ -219,15 +245,18 @@ fn set(window: &AmicaWindow, key: &str, value: &str) {
 #[cfg(windows)]
 use windows::{blocked, last_input, on_battery};
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+use crate::desktop::linux::on_battery;
+
+#[cfg(not(any(windows, target_os = "linux")))]
 fn last_input() -> Option<(u32, u32)> {
     None
 }
 #[cfg(not(windows))]
 fn blocked() -> bool {
-    true
+    !cfg!(target_os = "linux")
 }
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn on_battery() -> bool {
     false
 }
