@@ -225,6 +225,51 @@ export component AppsPanel inherits Rectangle {
                 }
             }
 
+            HorizontalLayout {
+                height: 39px;
+                spacing: 9px;
+                AppShortcut {
+                    name: "Paint";
+                    symbol: "M 4 17 L 14 5 L 19 9 L 9 21 L 4 21 Z M 12 8 L 17 12";
+                    open => { root.launch("paint"); }
+                }
+                AppShortcut {
+                    name: "Photos";
+                    symbol: "M 3 4 H 21 V 20 H 3 Z M 3 17 L 9 11 L 13 15 L 17 10 L 21 14";
+                    open => { root.launch("photos"); }
+                }
+            }
+
+            HorizontalLayout {
+                height: 39px;
+                spacing: 9px;
+                AppShortcut {
+                    name: "Clock";
+                    symbol: "M 12 3 A 9 9 0 1 1 11.99 3 M 12 7 V 12 L 16 14";
+                    open => { root.launch("clock"); }
+                }
+                AppShortcut {
+                    name: root.linux-desktop ? "Screenshot Tool" : "Snipping Tool";
+                    symbol: "M 9 4 H 4 V 9 M 15 4 H 20 V 9 M 20 15 V 20 H 15 M 9 20 H 4 V 15 M 9 12 H 15 M 12 9 V 15";
+                    open => { root.launch("snipping_tool"); }
+                }
+            }
+
+            HorizontalLayout {
+                height: 39px;
+                spacing: 9px;
+                AppShortcut {
+                    name: root.linux-desktop ? "Chromium" : "Microsoft Edge";
+                    symbol: "M 12 3 A 9 9 0 1 1 11.99 3 M 12 8 A 4 4 0 1 1 11.99 8 M 4 7 L 9 14 M 12 8 H 20 M 11 21 L 15 13";
+                    open => { root.launch("edge"); }
+                }
+                AppShortcut {
+                    name: root.linux-desktop ? "Recommended Software" : "Microsoft Store";
+                    symbol: "M 5 7 H 19 L 21 21 H 3 Z M 9 9 V 6 A 3 3 0 0 1 15 6 V 9";
+                    open => { root.launch("microsoft_store"); }
+                }
+            }
+
             if root.error != "" || root.pending: Text {
                 text: root.pending ? "Opening…" : root.error;
                 font-size: 12px;

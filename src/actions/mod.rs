@@ -665,8 +665,12 @@ pub fn exit_requested(input: &str) -> bool {
 }
 
 pub fn power_request(input: &str) -> Option<PanelAction> {
+    requested_power(input).map(PanelAction::Power)
+}
+
+fn requested_power(input: &str) -> Option<PowerAction> {
     let normalized = normalized_words(input);
-    let action = match strip_courtesy(&normalized) {
+    Some(match strip_courtesy(&normalized) {
         "shut down this pc"
         | "shut down the pc"
         | "shutdown this pc"
@@ -681,13 +685,15 @@ pub fn power_request(input: &str) -> Option<PanelAction> {
         | "restart this computer"
         | "restart the computer"
         | "reboot this pc"
+        | "reboot this computer"
         | "i restart mo ang pc" => PowerAction::Restart,
-        "sleep the pc" | "sleep this pc" | "put this pc to sleep" | "i sleep mo ang pc" => {
-            PowerAction::Sleep
-        }
+        "sleep the pc"
+        | "sleep this pc"
+        | "put this pc to sleep"
+        | "put this computer to sleep"
+        | "i sleep mo ang pc" => PowerAction::Sleep,
         _ => return None,
-    };
-    Some(PanelAction::Power(action))
+    })
 }
 
 pub fn spoken_panel(transcript: &str) -> Option<PanelAction> {
@@ -870,7 +876,8 @@ mod tests {
         assert_eq!(
             actions,
             [
-                PanelAction::Show(Panel::Youtube),
+                media::panel_for("youtube")
+                    .map_or(PanelAction::Launch("youtube"), PanelAction::Show),
                 PanelAction::Show(Panel::Apps),
                 PanelAction::Window(WindowAction::parse("fullscreen").unwrap()),
             ]

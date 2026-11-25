@@ -109,7 +109,7 @@ fn metric(name: &str) -> Result<String, String> {
         UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN},
     };
     match name {
-        "battery percentage" | "kasalukuyang pinagmumulan ng kuryente" => {
+        "battery percentage" | "kasalukuyang pinagmumulan ng kuryente" | "power source" => {
             let mut status = SYSTEM_POWER_STATUS::default();
             if unsafe { GetSystemPowerStatus(&mut status) } == 0 {
                 return Err("Windows could not read the power status.".into());
@@ -137,7 +137,7 @@ fn metric(name: &str) -> Result<String, String> {
             "Windows reports {} connected displays.",
             super::layout::monitors().len()
         )),
-        "default na audio output" => {
+        "default na audio output" | "default audio output" => {
             let device = cpal::traits::HostTrait::default_output_device(&cpal::default_host())
                 .ok_or("Windows did not report a default audio output.")?;
             Ok(format!(

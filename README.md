@@ -46,7 +46,15 @@ Install the build and desktop packages from the Pi terminal.
 sudo apt update
 sudo apt install build-essential curl git pkg-config libasound2-dev libfontconfig-dev \
   libwayland-client0 libwayland-cursor0 libxkbcommon0 fontconfig fonts-dejavu-core \
-  libglib2.0-bin xdg-user-dirs playerctl libnotify-bin
+  libglib2.0-bin xdg-user-dirs playerctl libnotify-bin pulseaudio-utils pavucontrol \
+  wlr-randr wdisplays x11-xserver-utils brightnessctl ddcutil
+```
+
+Install any missing launcher apps on Raspberry Pi OS Trixie. The Pi desktop image already includes some of these packages.
+
+```bash
+sudo apt install rpcc rp-prefapps gui-screenshot chromium galculator mousepad \
+  mtpaint gpicview gnome-clocks network-manager-gnome blueman gnome-disk-utility
 ```
 
 Install the current stable Rust toolchain. Amica needs Rust 1.95 or newer. If Rust is already installed through rustup, run `rustup update stable`. [Rustup installer](https://rustup.rs/)
@@ -70,7 +78,9 @@ Without the key, you can still use local features such as timers and the screens
 
 - The screensaver can start after idle time in the default labwc Wayland session. Use **Settings → Screensaver → Preview** to start it manually. [Raspberry Pi desktop configuration](https://www.raspberrypi.com/documentation/computers/configuration.html)
 - Media control requires a player that exposes MPRIS. The current player can be paused, resumed, or queried from Amica. Browser playback and DRM depend on the installed browser.
-- The command palette shows the Linux desktop commands. External-window automation, saved window layouts, and screen capture remain Windows features. Linux power actions depend on the device and desktop permissions.
+- The command palette accepts Linux system commands such as `Set system volume to 35%`, `Switch audio output to HDMI`, `Show display resolution`, and `Open settings for display`. Start Desktop Control before changing system settings. App volume and mute require an active audio stream. Audio output changes select the system default.
+- Brightness works with a controllable backlight or a DDC/CI monitor and I²C access. On labwc, `Set magnifier to 150%` applies display scaling when one display is active. GNOME uses its screen magnifier. Linux power actions depend on the device and desktop permissions.
+- The Screenshot Tool shortcut opens the desktop screenshot app. External-window automation, saved window layouts, and Amica's window-specific capture commands are Windows features.
 
 ## Quick start
 

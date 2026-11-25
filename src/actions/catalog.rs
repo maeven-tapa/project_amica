@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use regex::{Captures, Regex};
 
-use crate::desktop::ExternalAction;
+use crate::desktop::{ExternalAction, PowerAction};
 
 use super::command::{
     BrowserAction, Button, Command, Direction, FileAction, InputAction, Landmark, MediaAction,
@@ -466,7 +466,7 @@ const RULES: &[Rule] = &[
         |m| Some(Command::CopyTitle(first(m)?.into())),
     ),
     (
-        r"^(?:set (?:(?:the )?(?:windows )?volume|mo ang volume) to|itakda ang lakas ng tunog sa) (\d+)%$",
+        r"^(?:set (?:(?:the )?(?:(?:windows|system|master) )?volume|mo ang volume) to|itakda ang lakas ng tunog sa) (\d+)%$",
         |m| {
             Some(Command::System(SystemAction::Volume(
                 m[1].parse().ok()?,
@@ -475,7 +475,7 @@ const RULES: &[Rule] = &[
         },
     ),
     (
-        r"^(?:adjust (?:(?:the|mo ang) )?(?:windows )?volume (up|down) (\d+) percentage points|baguhin ang lakas ng tunog nang (\d+) puntos (pataas|pababa))$",
+        r"^(?:adjust (?:(?:the|mo ang) )?(?:(?:windows|system|master) )?volume (up|down) (\d+) percentage points|baguhin ang lakas ng tunog nang (\d+) puntos (pataas|pababa))$",
         |m| {
             let direction = Direction::parse(part(m, 1).or_else(|| part(m, 4))?)?;
             let percent: i32 = part(m, 2).or_else(|| part(m, 3))?.parse().ok()?;
@@ -499,11 +499,11 @@ const RULES: &[Rule] = &[
         },
     ),
     (
-        r"^(?:mute (.+?) in the windows mixer|patahimikin ang (.+?) sa windows mixer|i-mute mo yung (.+?) lang sa mixer)$",
+        r"^(?:mute (.+?) in (?:the )?(?:(?:windows|system|volume) )?mixer|patahimikin ang (.+?) sa (?:windows )?mixer|i-mute mo yung (.+?) lang sa mixer)$",
         |m| Some(Command::System(SystemAction::Mute(first(m)?.into()))),
     ),
     (
-        r"^(?:ilipat ang tunog ng windows sa|switch (?:mo ang windows audio output|windows sound output) to) (.+)$",
+        r"^(?:ilipat ang tunog (?:ng windows )?sa|switch (?:(?:mo ang|the) )?(?:(?:windows|system) )?(?:audio|sound) output to) (.+)$",
         |m| Some(Command::System(SystemAction::Output(m[1].into(), None))),
     ),
     (
@@ -525,7 +525,7 @@ const RULES: &[Rule] = &[
         },
     ),
     (
-        r"^(?:ipakita ang (gamit ng cpu|gamit ng memory|bilis ng download|bilis ng upload|kasalukuyang pinagmumulan ng kuryente|default na audio output) ng pc na ito|show mo yung (cpu usage|memory usage|download rate|upload rate|battery percentage|display resolution) ng pc|show me (cpu usage|ram usage|download rate|upload rate|free disk space|number of connected monitors) on this pc)$",
+        r"^(?:ipakita ang (gamit ng cpu|gamit ng memory|bilis ng download|bilis ng upload|kasalukuyang pinagmumulan ng kuryente|default na audio output) ng pc na ito|show mo yung (cpu usage|memory usage|download rate|upload rate|battery percentage|display resolution) ng pc|show(?: me)? (?:the )?(cpu usage|memory usage|ram usage|download rate|upload rate|free disk space|number of connected monitors|battery percentage|power source|display resolution|default audio output)(?: on this (?:pc|computer))?)$",
         |m| {
             Some(Command::System(SystemAction::Metric(
                 first(m)?.to_lowercase(),
@@ -533,7 +533,7 @@ const RULES: &[Rule] = &[
         },
     ),
     (
-        r"^(?:set (?:this display['’]s brightness|mo yung screen brightness) to (\d+)%|itakda sa (\d+)% ang liwanag ng screen na ito)$",
+        r"^(?:set (?:this display['’]s brightness|(?:mo yung )?screen brightness|display brightness|brightness) to (\d+)%|itakda sa (\d+)% ang liwanag ng screen na ito)$",
         |m| {
             Some(Command::System(SystemAction::Brightness(
                 first(m)?.parse().ok()?,
@@ -541,11 +541,11 @@ const RULES: &[Rule] = &[
         },
     ),
     (
-        r"^(?:show me windows settings for|ipakita ang mga setting ng windows para sa|open mo yung windows settings for|show me where to change|ipakita kung saan mababago ang|show me yung setting for) (.+)$",
+        r"^(?:show me (?:windows|system|linux) settings for|ipakita ang mga setting (?:ng windows )?para sa|open (?:mo yung )?(?:(?:windows|system|linux) )?settings for|show me where to change|ipakita kung saan mababago ang|show me yung setting for) (.+)$",
         |m| Some(Command::System(SystemAction::Settings(m[1].into()))),
     ),
     (
-        r"^(?:set (?:windows magnifier|mo ang magnifier) to|itakda ang windows magnifier sa) (\d+)%$",
+        r"^(?:set (?:(?:windows|mo ang|the) )?magnifier to|itakda ang (?:windows )?magnifier sa) (\d+)%$",
         |m| Some(Command::System(SystemAction::Magnifier(m[1].parse().ok()?))),
     ),
     (
@@ -675,9 +675,10 @@ const RULES: &[Rule] = &[
         r"^(?:show the last run of my (.+?) routine|show mo yung last run ng (.+?) routine ko|ipakita ang huling pagpapatakbo ng routine kong (.+))$",
         |m| Some(Command::Routines(RoutineAction::LastRun(first(m)?.into()))),
     ),
-    (r"^(?:open (?:mo ang |the )?|buksan ang )(.+)$", |m| {
-        view(&m[1]).or_else(|| app(&m[1]).map(|name| Command::Launch(name.into())))
-    }),
+    (
+        r"^(?:(?:open|launch) (?:mo ang |the )?|buksan ang )(.+)$",
+        |m| view(&m[1]).or_else(|| app(&m[1]).map(|name| Command::Launch(name.into()))),
+    ),
     (
         r"^(?:can i (?:vent|talk) about|puwede ba nating pag-usapan|help (?:me (?:plan|decide|choose|reflect)|mo akong mag-plan)|tulungan mo akong|brainstorm|mag-isip tayo|explain|ipaliwanag|practice|magsanay|draft|gumawa ng maikling draft|quiz me|i-quiz mo ako|tanungin mo ako|give me a journal prompt|bigyan mo ako).+$",
         |_| Some(Command::Companion),
@@ -721,6 +722,14 @@ pub fn parse(input_text: &str) -> Option<Command> {
             break;
         }
     }
+    if let Some(action) = super::requested_power(text) {
+        let id = match action {
+            PowerAction::Shutdown => "shutdown",
+            PowerAction::Restart => "restart",
+            PowerAction::Sleep => "sleep",
+        };
+        return Some(Command::Power(id.into()));
+    }
     let command = match text.to_lowercase().as_str() {
         "start focus" | "simulan ang focus" | "start mo ang focus" => {
             Command::Timer(1500, "Focus".into())
@@ -746,9 +755,6 @@ pub fn parse(input_text: &str) -> Option<Command> {
             Command::View("routines".into())
         }
         "start the screensaver" => Command::Saver("".into()),
-        "shut down this pc" | "shut down the pc" => Command::Power("shutdown".into()),
-        "restart this pc" | "restart the pc" => Command::Power("restart".into()),
-        "sleep this pc" | "sleep the pc" => Command::Power("sleep".into()),
         _ => {
             return PARSERS.iter().find_map(|(pattern, (_, parser))| {
                 pattern.captures(text).and_then(|m| parser(&m))
@@ -760,19 +766,20 @@ pub fn parse(input_text: &str) -> Option<Command> {
 
 pub fn app(input: &str) -> Option<&'static str> {
     Some(match input.trim().to_lowercase().as_str() {
-        "notepad" => "notepad",
+        "notepad" | "text editor" => "notepad",
         "calculator" => "calculator",
-        "explorer" | "file explorer" => "file_explorer",
-        "windows settings" | "settings" => "settings",
+        "explorer" | "file explorer" | "file manager" => "file_explorer",
+        "windows settings" | "settings" | "system settings" | "control centre"
+        | "control center" => "settings",
         "browser" | "default browser" => "browser",
         "youtube" => "youtube",
         "spotify" => "spotify",
-        "paint" => "paint",
-        "photos" => "photos",
+        "paint" | "image editor" => "paint",
+        "photos" | "image viewer" => "photos",
         "clock" => "clock",
-        "snipping tool" => "snipping_tool",
-        "microsoft edge" | "edge" => "edge",
-        "microsoft store" => "microsoft_store",
+        "snipping tool" | "screenshot tool" => "snipping_tool",
+        "microsoft edge" | "edge" | "chromium" => "edge",
+        "microsoft store" | "recommended software" | "software store" => "microsoft_store",
         _ => return None,
     })
 }

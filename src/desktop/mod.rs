@@ -162,6 +162,21 @@ pub fn app_id(id: &str) -> Option<&'static str> {
     APP_IDS.iter().copied().find(|&name| name == id)
 }
 
+pub fn app_label(id: &str) -> String {
+    if cfg!(target_os = "linux") {
+        let label = match id {
+            "edge" => "the Chromium shortcut",
+            "microsoft_store" => "the software manager",
+            "file_explorer" => "the file manager",
+            "notepad" => "the text editor",
+            "snipping_tool" => "the screenshot tool",
+            _ => return id.replace('_', " "),
+        };
+        return label.into();
+    }
+    id.replace('_', " ")
+}
+
 pub fn restore_external_windows() {
     #[cfg(windows)]
     external::restore_all();

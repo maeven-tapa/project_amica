@@ -143,15 +143,11 @@ pub fn available(command: &Command) -> bool {
         Command::Browser(action) => {
             matches!(action, BrowserAction::Open(_) | BrowserAction::Search(_))
         }
-        Command::System(action) => {
-            matches!(action, SystemAction::Volume(..) | SystemAction::Metric(_))
-        }
         Command::Media(MediaAction::Rate(_)) => false,
         Command::Routines(
             super::command::RoutineAction::SaveLayout(_)
             | super::command::RoutineAction::RestoreLayout(_),
         ) => false,
-        Command::Launch(id) => desktop::linux::supports(id),
         _ => true,
     };
     #[cfg(not(target_os = "linux"))]
@@ -340,7 +336,7 @@ fn execute(window: &AmicaWindow, command: Command) -> Result<String, String> {
             } else {
                 desktop::open_app(&name)?;
             }
-            Ok(format!("Opened {}.", name.replace('_', " ")))
+            Ok(format!("Opened {}.", desktop::app_label(&name)))
         }
         Command::Saver(preset) => {
             window.invoke_enter_saver(preset.into());
@@ -442,10 +438,7 @@ fn platform(_: &AmicaWindow, command: Command) -> Result<String, String> {
             desktop::open_browser_url(url.as_str())?;
             Ok("Opened a browser search for the requested query.".into())
         }
-        Command::System(SystemAction::Metric(name)) => desktop::linux::metric(&name),
-        Command::System(SystemAction::Volume(amount, relative)) => {
-            desktop::linux::set_volume(amount, relative).map_err(str::to_owned)
-        }
+        Command::System(action) => desktop::linux::execute(&action),
         _ => Err("This desktop action is unavailable on Linux.".into()),
     }
 }
